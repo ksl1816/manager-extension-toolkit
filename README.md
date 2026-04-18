@@ -146,4 +146,10 @@ MIT — free to use, modify, and distribute.
 
 ---
 
+## 👤 Author
+
+**ksl1816** — [github.com/ksl1816](https://github.com/ksl1816)
+
+*Contributions, bug reports, and feature suggestions are welcome — open an issue or pull request.*
+
 *Built for the Manager.io developer and user community.*
