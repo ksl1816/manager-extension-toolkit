@@ -1,0 +1,1864 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Manager.io — Developer Toolkit</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#070c18;--surface:#0d1526;--surface2:#111d36;--surface3:#162040;
+  --border:#1e2e52;--border2:#253660;--text:#ddeaff;--muted:#6a82aa;--dim:#3d5280;
+  --accent:#4a90ff;--accent2:#7ab8ff;--green:#3dffa0;--green2:#00c96a;
+  --amber:#ffb940;--red:#ff5757;--purple:#a78bfa;
+  --mono:'JetBrains Mono',monospace;--sans:'Syne',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;
+  background-image:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(74,144,255,.12) 0%,transparent 70%),
+  radial-gradient(ellipse 40% 30% at 90% 80%,rgba(167,139,250,.06) 0%,transparent 60%);}
+.app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+/* ── topbar ── */
+.topbar{display:flex;align-items:center;gap:14px;padding:10px 18px;
+  background:rgba(13,21,38,.97);border-bottom:1px solid var(--border);flex-shrink:0;}
+.logo{font-size:15px;font-weight:800;letter-spacing:-.02em;
+  background:linear-gradient(135deg,var(--accent2),var(--purple));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap;}
+.topbar-sub{font-size:11px;color:var(--muted);border-left:1px solid var(--border);padding-left:12px;font-family:var(--mono)}
+.topbar-badge{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--green);
+  background:rgba(61,255,160,.1);border:1px solid rgba(61,255,160,.2);border-radius:5px;padding:3px 8px;}
+.clock{font-family:var(--mono);font-size:11px;color:var(--dim);margin-left:8px}
+
+/* ── input bar ── */
+.inputbar{display:flex;align-items:center;gap:7px;padding:10px 18px;
+  background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
+.prefix-badge{font-family:var(--mono);font-size:12px;color:var(--muted);
+  background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px 11px;white-space:nowrap;}
+.endpoint-wrap{flex:1;min-width:140px}
+.endpoint-wrap input{width:100%;padding:8px 11px;background:var(--surface2);border:1px solid var(--border2);
+  border-radius:7px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;transition:border-color .2s;}
+.endpoint-wrap input:focus{border-color:var(--accent)}
+.pagesize-wrap{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);white-space:nowrap;
+  background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:0 10px;}
+.pagesize-wrap span{font-size:11px}
+.pagesize-wrap input{width:80px;padding:8px 4px;text-align:center;background:transparent;border:none;
+  border-left:1px solid var(--border);margin-left:5px;padding-left:8px;
+  color:var(--text);font-family:var(--mono);font-size:13px;outline:none;}
+.btn{border:none;border-radius:7px;padding:8px 14px;font-family:var(--sans);font-size:13px;font-weight:600;
+  cursor:pointer;transition:all .16s;white-space:nowrap;}
+.btn:hover{transform:translateY(-1px)}
+.btn:active{transform:none}
+.btn-load{background:linear-gradient(135deg,#2563eb,#4a90ff);color:#fff}
+.btn-load:hover{box-shadow:0 4px 18px rgba(74,144,255,.4)}
+.btn-loadall{background:linear-gradient(135deg,#7c3aed,#a78bfa);color:#fff}
+.btn-loadall:hover{box-shadow:0 4px 18px rgba(167,139,250,.4)}
+.btn-stop{background:linear-gradient(135deg,#b91c1c,#ff5757);color:#fff;animation:pulseRed 1.2s ease-in-out infinite;}
+@keyframes pulseRed{0%,100%{box-shadow:0 0 0 0 rgba(255,87,87,.4)}50%{box-shadow:0 0 0 6px rgba(255,87,87,0)}}
+.btn-copy{background:var(--surface3);color:var(--text);border:1px solid var(--border2)}
+.btn-clear{background:var(--surface3);color:var(--muted);border:1px solid var(--border2)}
+.btn-schema{background:var(--surface3);color:var(--purple);border:1px solid var(--border2)}
+
+/* ── total bar ── */
+.totalbar{display:flex;align-items:center;gap:10px;padding:6px 18px;
+  background:rgba(61,255,160,.04);border-bottom:1px solid rgba(61,255,160,.1);
+  flex-shrink:0;font-size:12px;font-family:var(--mono);}
+.total-label{color:var(--dim)}
+.total-value{color:var(--green);font-weight:600}
+.loadall-progress{display:none;align-items:center;gap:8px;margin-left:8px}
+.loadall-progress.active{display:flex}
+.progress-bar-wrap{width:120px;height:6px;background:var(--surface3);border-radius:3px;overflow:hidden}
+.progress-bar{height:100%;background:linear-gradient(90deg,var(--green2),var(--green));border-radius:3px;transition:width .3s}
+.progress-text{font-size:11px;color:var(--green);min-width:80px}
+.total-pager{display:flex;align-items:center;gap:6px;margin-left:auto}
+.pager-btn{background:var(--surface2);border:1px solid var(--border2);border-radius:5px;
+  color:var(--text);font-family:var(--mono);font-size:11px;padding:3px 9px;cursor:pointer;transition:all .14s;}
+.pager-btn:hover{background:var(--surface3);border-color:var(--accent)}
+.pager-btn:disabled{opacity:.3;cursor:not-allowed}
+.page-indicator{color:var(--accent2);font-size:11px;min-width:80px;text-align:center}
+
+/* ── quick bar ── */
+.quickbar{padding:8px 18px;background:var(--surface);border-bottom:1px solid var(--border);
+  flex-shrink:0;display:flex;flex-wrap:wrap;gap:5px;align-items:center;}
+.ql{font-size:10px;font-weight:700;color:var(--dim);letter-spacing:.1em;text-transform:uppercase;
+  margin-right:2px;white-space:nowrap}
+.qbtn{padding:5px 10px;font-size:11px;font-family:var(--mono);font-weight:600;
+  border:none;border-radius:6px;cursor:pointer;transition:all .14s;white-space:nowrap;}
+.qbtn:hover{transform:translateY(-1px)}
+.q-l{background:rgba(74,144,255,.12);color:var(--accent2)}.q-l:hover{background:rgba(74,144,255,.22)}
+.q-r{background:rgba(61,255,160,.1);color:var(--green)}.q-r:hover{background:rgba(61,255,160,.2)}
+.q-s{background:rgba(255,185,64,.1);color:var(--amber)}.q-s:hover{background:rgba(255,185,64,.2)}
+
+/* ── stats ── */
+.statsbar{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface)}
+.stat{flex:1;padding:9px 14px;border-right:1px solid var(--border)}
+.stat:last-child{border-right:none}
+.stat-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:3px}
+.stat-value{font-size:17px;font-weight:800;font-family:var(--mono)}
+.sv-idle{color:var(--dim)}.sv-ok{color:var(--green)}.sv-err{color:var(--red)}
+.sv-load{color:var(--amber);animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ── viewer ── */
+.viewer{display:grid;grid-template-columns:280px 1fr;flex:1;overflow:hidden}
+
+/* ── sidebar ── */
+.sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.sidebar-head{padding:9px 12px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
+  display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+.path-count{font-family:var(--mono);color:var(--accent2);font-size:11px;font-weight:600;letter-spacing:0;text-transform:none}
+.sidebar-actions{display:flex;gap:5px;padding:6px 9px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.sidebar-actions button{flex:1;padding:5px 6px;font-size:10px;font-family:var(--mono);font-weight:600;
+  background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--muted);cursor:pointer;transition:all .14s;}
+.sidebar-actions button:hover{color:var(--text);border-color:var(--border2)}
+.sidebar-search{padding:7px 9px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sidebar-search input{width:100%;padding:6px 9px;background:var(--surface2);border:1px solid var(--border);
+  border-radius:6px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;}
+.sidebar-search input::placeholder{color:var(--dim)}
+.path-list{flex:1;overflow-y:auto;padding:7px}
+.path-list::-webkit-scrollbar{width:4px}
+.path-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.path-item{padding:5px 8px;border-radius:6px;margin-bottom:2px;
+  font-family:var(--mono);font-size:11px;color:var(--muted);transition:all .12s;
+  display:flex;align-items:center;gap:5px;word-break:break-all;}
+.path-item:hover{background:var(--surface3);color:var(--text)}
+.path-item input[type=checkbox]{width:13px;height:13px;flex-shrink:0;accent-color:var(--accent);cursor:pointer;}
+.path-item .path-text{flex:1;cursor:pointer;min-width:0}
+.pt{font-size:9px;padding:2px 5px;border-radius:4px;flex-shrink:0;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.pt-str{background:rgba(61,255,160,.12);color:var(--green)}
+.pt-num{background:rgba(74,144,255,.12);color:var(--accent2)}
+.pt-bool{background:rgba(167,139,250,.12);color:var(--purple)}
+.pt-null{background:rgba(107,130,170,.12);color:var(--muted)}
+.pt-obj{background:rgba(255,185,64,.12);color:var(--amber)}
+.pt-arr{background:rgba(255,87,87,.12);color:var(--red)}
+.path-val{color:var(--dim);font-size:10px;margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:65px;flex-shrink:0}
+
+/* ── json area ── */
+.json-area{display:flex;flex-direction:column;overflow:hidden;background:#07111f}
+.json-toolbar{display:flex;align-items:center;gap:7px;padding:7px 12px;
+  border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface2);}
+.json-path-display{font-family:var(--mono);font-size:11px;color:var(--accent2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.view-toggle{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.view-toggle button{padding:4px 10px;font-size:11px;font-family:var(--mono);
+  background:none;border:none;color:var(--muted);cursor:pointer;transition:all .14s;}
+.view-toggle button.active{background:var(--accent);color:#fff}
+
+/* result pagination */
+.result-pager{display:none;align-items:center;gap:8px;padding:6px 12px;
+  border-bottom:1px solid var(--border);background:var(--surface2);flex-shrink:0;font-family:var(--mono);font-size:11px;}
+.result-pager.visible{display:flex}
+.result-pager span{color:var(--muted)}
+.result-pager strong{color:var(--accent2)}
+.rp-btn{background:var(--surface3);border:1px solid var(--border2);border-radius:5px;
+  color:var(--text);font-family:var(--mono);font-size:11px;padding:3px 9px;cursor:pointer;}
+.rp-btn:disabled{opacity:.3;cursor:not-allowed}
+.rp-btn:not(:disabled):hover{border-color:var(--accent)}
+
+pre{flex:1;overflow:auto;margin:0;padding:15px 17px;font-family:var(--mono);font-size:12.5px;
+  line-height:1.65;color:#8eb5f0;white-space:pre-wrap;word-break:break-all;}
+pre::-webkit-scrollbar{width:6px;height:6px}
+pre::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+.jk{color:#7ab8ff}.js{color:#3dffa0}.jn{color:#ffb940}.jb{color:#a78bfa}.jl{color:#ff5757}.jp{color:#4a90ff}
+
+/* ── AI CONTEXT BUFFER PANEL ── */
+.sel-panel{position:fixed;top:0;right:0;width:460px;height:100vh;
+  background:var(--surface);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;z-index:200;
+  transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);}
+.sel-panel.open{transform:translateX(0)}
+.sel-panel-head{display:flex;align-items:center;gap:10px;padding:12px 14px;
+  border-bottom:1px solid var(--border);flex-shrink:0;}
+.sel-panel-title{font-size:13px;font-weight:700;color:var(--text);flex:1}
+.sel-panel-close{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:2px 6px;border-radius:4px}
+.sel-panel-close:hover{background:var(--surface3);color:var(--text)}
+
+/* panel tabs */
+.panel-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.panel-tab{flex:1;padding:8px;font-size:12px;font-weight:600;font-family:var(--sans);
+  background:none;border:none;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .14s;}
+.panel-tab.active{color:var(--text);border-bottom-color:var(--accent)}
+
+.panel-section{display:none;flex:1;flex-direction:column;overflow:hidden}
+.panel-section.active{display:flex}
+
+/* context buffer tab */
+.sel-items{flex:1;overflow-y:auto;padding:10px}
+.sel-items::-webkit-scrollbar{width:4px}
+.sel-items::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.sel-item{display:flex;align-items:flex-start;gap:10px;background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:all .14s;}
+.sel-item:hover{border-color:var(--accent2)}
+.sel-item.checked{border-color:var(--green2);background:rgba(0,201,106,.06)}
+.sel-item input[type=checkbox]{width:15px;height:15px;flex-shrink:0;margin-top:1px;accent-color:var(--green2);cursor:pointer;}
+.sel-item-body{flex:1;min-width:0}
+.sel-item-name{font-family:var(--mono);font-size:11px;color:var(--accent2);font-weight:600;margin-bottom:3px}
+.sel-item-preview{font-family:var(--mono);font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sel-item-meta{font-size:10px;color:var(--dim);margin-top:3px}
+.sel-empty{color:var(--dim);font-size:13px;padding:20px;text-align:center;font-style:italic;line-height:1.7}
+.sel-output{font-family:var(--mono);font-size:11px;color:var(--green);white-space:pre-wrap;word-break:break-all;
+  background:#040a10;border-top:1px solid var(--border);padding:12px;display:none;max-height:200px;overflow:auto;}
+.sel-output.visible{display:block}
+.sel-footer{padding:10px 14px;border-top:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;gap:7px}
+.sel-footer-info{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.sel-copy-btn{background:linear-gradient(135deg,var(--green2),#3dffa0);color:#07111f;border:none;
+  border-radius:8px;padding:10px;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;transition:all .16s;}
+.sel-copy-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 18px rgba(0,201,106,.4)}
+.sel-copy-btn:disabled{opacity:.35;cursor:not-allowed}
+.sel-clear-btn{background:var(--surface3);border:1px solid var(--border2);border-radius:8px;
+  padding:7px;font-family:var(--sans);font-size:12px;color:var(--muted);cursor:pointer;}
+.sel-clear-btn:hover{color:var(--text)}
+
+/* ── AI Syntax Builder tab ── */
+.ai-builder{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.ai-builder::-webkit-scrollbar{width:4px}
+.ai-builder::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.ai-section-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+.ai-info{font-size:12px;color:var(--muted);line-height:1.6;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;}
+.ai-info strong{color:var(--accent2)}
+.ai-options{display:flex;flex-direction:column;gap:6px}
+.ai-option{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer}
+.ai-option input{accent-color:var(--purple);width:14px;height:14px}
+.ai-generate-btn{background:linear-gradient(135deg,#7c3aed,#a78bfa);color:#fff;border:none;
+  border-radius:8px;padding:11px;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;transition:all .16s;}
+.ai-generate-btn:hover{transform:translateY(-1px);box-shadow:0 4px 18px rgba(167,139,250,.4)}
+.ai-generate-btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+.ai-output-area{flex:1;position:relative}
+.ai-output{width:100%;min-height:320px;max-height:520px;padding:12px;background:#040a10;border:1px solid var(--border);
+  border-radius:8px;color:var(--green);font-family:var(--mono);font-size:11px;line-height:1.65;
+  resize:vertical;outline:none;white-space:pre-wrap;}
+
+
+.ai-copy-btn{margin-top:6px;width:100%;background:var(--surface3);border:1px solid var(--border2);border-radius:8px;
+  padding:9px;font-family:var(--sans);font-size:12px;font-weight:600;color:var(--text);cursor:pointer;transition:all .14s;}
+.ai-copy-btn:hover{background:var(--surface2);border-color:var(--accent)}
+
+.chip-btn{padding:5px 10px;font-size:11px;font-family:var(--mono);font-weight:600;
+  background:var(--surface2);border:1px solid var(--border2);border-radius:6px;
+  color:var(--muted);cursor:pointer;transition:all .14s;white-space:nowrap;}
+.chip-btn:hover{border-color:var(--accent2);color:var(--text)}
+.chip-btn.chip-active{background:rgba(74,144,255,.18);border-color:var(--accent);color:var(--accent2)}
+
+.field-tag{display:inline-flex;align-items:center;gap:4px;padding:3px 7px;
+  background:rgba(61,255,160,.1);border:1px solid rgba(61,255,160,.2);border-radius:5px;
+  font-family:var(--mono);font-size:10px;color:var(--green);white-space:nowrap;}
+
+.ep-tag{display:flex;align-items:center;gap:6px;padding:5px 8px;
+  background:var(--surface2);border:1px solid var(--border2);border-radius:6px;
+  font-family:var(--mono);font-size:11px;color:var(--accent2);}
+.ep-tag-dot{width:6px;height:6px;border-radius:50%;background:var(--green2);flex-shrink:0}
+
+/* ── floating trigger ── */
+.sel-trigger{position:fixed;bottom:24px;right:24px;z-index:100;
+  background:linear-gradient(135deg,var(--accent),var(--purple));color:#fff;
+  border:none;border-radius:12px;padding:11px 18px;font-family:var(--sans);
+  font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 24px rgba(74,144,255,.4);
+  transition:all .2s;display:flex;align-items:center;gap:8px;}
+.sel-trigger:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(74,144,255,.5)}
+.sel-badge{background:rgba(255,255,255,.25);border-radius:10px;padding:1px 7px;font-size:11px}
+
+/* overlay */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:150;opacity:0;pointer-events:none;transition:opacity .28s;}
+.overlay.open{opacity:1;pointer-events:all}
+
+/* toast */
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(70px);opacity:0;
+  background:var(--green2);color:#fff;font-family:var(--sans);font-size:13px;font-weight:600;
+  padding:9px 20px;border-radius:9px;transition:all .28s;pointer-events:none;z-index:999;white-space:nowrap;}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+@media(max-width:860px){
+  .viewer{grid-template-columns:1fr}.sidebar{display:none}
+  .stat-value{font-size:14px}.sel-panel{width:100vw}
+}
+
+/* ── HOW TO USE GUIDE ── */
+.btn-guide{
+  background:rgba(61,255,160,.12);color:var(--green);
+  border:1px solid rgba(61,255,160,.25);border-radius:7px;
+  padding:6px 13px;font-family:var(--sans);font-size:12px;font-weight:700;
+  cursor:pointer;transition:all .16s;white-space:nowrap;letter-spacing:.01em;
+  display:flex;align-items:center;gap:6px;
+}
+.btn-guide:hover{background:rgba(61,255,160,.22);border-color:rgba(61,255,160,.5);transform:translateY(-1px)}
+
+.guide-overlay{
+  position:fixed;inset:0;background:rgba(4,10,20,.88);z-index:500;
+  opacity:0;pointer-events:none;transition:opacity .25s;
+  display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto;
+}
+.guide-overlay.open{opacity:1;pointer-events:all}
+
+.guide-modal{
+  background:var(--surface);border:1px solid var(--border2);border-radius:16px;
+  width:100%;max-width:760px;display:flex;flex-direction:column;
+  box-shadow:0 24px 80px rgba(0,0,0,.7);margin:auto;
+}
+.guide-header{
+  display:flex;align-items:center;gap:12px;padding:18px 22px;
+  border-bottom:1px solid var(--border);flex-shrink:0;
+  background:linear-gradient(135deg,rgba(74,144,255,.08),rgba(167,139,250,.06));
+  border-radius:16px 16px 0 0;
+}
+.guide-title{
+  font-size:16px;font-weight:800;letter-spacing:-.02em;
+  background:linear-gradient(135deg,var(--accent2),var(--purple));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;flex:1;
+}
+.guide-close{
+  background:none;border:1px solid var(--border2);color:var(--muted);
+  font-size:16px;cursor:pointer;padding:4px 10px;border-radius:7px;
+  transition:all .14s;line-height:1;
+}
+.guide-close:hover{background:rgba(255,87,87,.12);border-color:var(--red);color:var(--red)}
+
+.guide-body{padding:22px;display:flex;flex-direction:column;gap:22px}
+
+.guide-intro{
+  font-size:13px;color:var(--muted);line-height:1.7;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:14px 16px;
+}
+.guide-intro strong{color:var(--accent2)}
+
+.guide-steps{display:flex;flex-direction:column;gap:14px}
+
+.guide-step{
+  display:flex;gap:14px;align-items:flex-start;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:14px 16px;transition:border-color .14s;
+}
+.guide-step:hover{border-color:var(--border2)}
+
+.step-num{
+  width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:12px;font-weight:700;flex-shrink:0;margin-top:1px;
+}
+.sn-blue{background:rgba(74,144,255,.2);color:var(--accent2);border:1px solid rgba(74,144,255,.3)}
+.sn-green{background:rgba(61,255,160,.15);color:var(--green);border:1px solid rgba(61,255,160,.25)}
+.sn-purple{background:rgba(167,139,250,.15);color:var(--purple);border:1px solid rgba(167,139,250,.25)}
+.sn-amber{background:rgba(255,185,64,.15);color:var(--amber);border:1px solid rgba(255,185,64,.25)}
+
+.step-content{flex:1;min-width:0}
+.step-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:5px}
+.step-desc{font-size:12px;color:var(--muted);line-height:1.65}
+.step-desc code{
+  font-family:var(--mono);font-size:11px;color:var(--accent2);
+  background:rgba(74,144,255,.1);border:1px solid rgba(74,144,255,.2);
+  border-radius:4px;padding:1px 5px;
+}
+.step-tip{
+  margin-top:7px;font-size:11px;color:var(--green);
+  background:rgba(61,255,160,.07);border:1px solid rgba(61,255,160,.15);
+  border-radius:6px;padding:6px 10px;line-height:1.55;
+}
+.step-tip strong{color:var(--green)}
+
+.guide-pills{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.guide-pill{
+  font-family:var(--mono);font-size:10px;font-weight:600;padding:3px 8px;
+  border-radius:5px;border:1px solid;
+}
+.gp-blue{background:rgba(74,144,255,.12);color:var(--accent2);border-color:rgba(74,144,255,.25)}
+.gp-amber{background:rgba(255,185,64,.1);color:var(--amber);border-color:rgba(255,185,64,.2)}
+.gp-green{background:rgba(61,255,160,.1);color:var(--green);border-color:rgba(61,255,160,.2)}
+
+.guide-footer{
+  padding:14px 22px;border-top:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  border-radius:0 0 16px 16px;background:rgba(13,21,38,.6);
+}
+.guide-footer-note{font-size:11px;color:var(--dim);font-family:var(--mono)}
+.guide-footer-close{
+  background:linear-gradient(135deg,var(--green2),var(--green));
+  color:#07111f;border:none;border-radius:8px;
+  padding:9px 22px;font-family:var(--sans);font-size:13px;font-weight:700;
+  cursor:pointer;transition:all .16s;
+}
+.guide-footer-close:hover{transform:translateY(-1px);box-shadow:0 4px 18px rgba(0,201,106,.4)}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- Topbar -->
+<div class="topbar">
+  <div class="logo">Manager.io — Developer Toolkit</div>
+  <div class="topbar-sub">v1.0 · Extension Builder</div>
+  <div class="topbar-badge">Professional</div>
+  <div class="clock" id="clock"></div>
+  <button class="btn-guide" onclick="openGuide()">📖 How to Use</button>
+</div>
+
+<!-- Input bar -->
+<div class="inputbar">
+  <div class="prefix-badge">/api4/</div>
+  <div class="endpoint-wrap">
+    <input id="path" type="text" value="batch-sales-invoice" placeholder="e.g. batch-customer" autocomplete="off" spellcheck="false">
+  </div>
+  <div class="pagesize-wrap">
+    <span>Rows&nbsp;</span>
+    <input id="pagesize" type="number" value="1" min="1" max="1000000">
+  </div>
+  <button class="btn btn-load"    id="btn-load"    onclick="loadData()">▶ Load</button>
+  <button class="btn btn-loadall" id="btn-loadall" onclick="loadAll()">⬇ Load All</button>
+  <button class="btn btn-stop"    id="btn-stop"    onclick="stopLoadAll()" style="display:none">■ Stop</button>
+  <button class="btn btn-copy"    onclick="copyJson()">⎘ Copy JSON</button>
+  <button class="btn btn-schema"  onclick="setView('schema')">◈ Schema</button>
+  <button class="btn btn-clear"   onclick="clearAll()">✕ Clear</button>
+</div>
+
+<!-- Quick bar -->
+<div class="quickbar">
+  <span class="ql">Lists</span>
+  <button class="qbtn q-l" onclick="quick('batch-customer')">customers</button>
+  <button class="qbtn q-l" onclick="quick('batch-supplier')">suppliers</button>
+  <button class="qbtn q-l" onclick="quick('batch-sales-invoice')">sales invoices</button>
+  <button class="qbtn q-l" onclick="quick('batch-purchase-invoice')">purchase invoices</button>
+  <button class="qbtn q-l" onclick="quick('batch-receipt')">receipts</button>
+  <button class="qbtn q-l" onclick="quick('batch-payment')">payments</button>
+  <button class="qbtn q-l" onclick="quick('batch-inventory-item')">inventory</button>
+  <button class="qbtn q-l" onclick="quick('batch-employee')">employees</button>
+  <button class="qbtn q-l" onclick="quick('batch-bank-or-cash-account')">bank accounts</button>
+  <button class="qbtn q-l" onclick="quick('batch-journal-entry')">journal entries</button>
+  <span class="ql" style="margin-left:8px">Summaries</span>
+  <button class="qbtn q-s" onclick="quick('batch-customer-summary')">customer summary</button>
+  <button class="qbtn q-s" onclick="quick('batch-supplier-summary')">supplier summary</button>
+  <button class="qbtn q-s" onclick="quick('batch-sales-invoice-totals-by-customer')">invoice totals/customer</button>
+  <span class="ql" style="margin-left:8px">Reports</span>
+  <button class="qbtn q-r" onclick="quickReport('aged-receivables')">aged receivables</button>
+  <button class="qbtn q-r" onclick="quickReport('aged-payables')">aged payables</button>
+  <button class="qbtn q-r" onclick="quickReport('trial-balance')">trial balance</button>
+  <button class="qbtn q-r" onclick="quickReport('profit-and-loss-statement')">P&amp;L</button>
+  <button class="qbtn q-r" onclick="quickReport('balance-sheet')">balance sheet</button>
+  <button class="qbtn q-r" onclick="quickReport('general-ledger-transactions')">general ledger</button>
+  <span class="ql" style="margin-left:8px">Meta</span>
+  <button class="qbtn q-s" onclick="quickReport('businesses')">businesses</button>
+</div>
+
+<!-- Total bar -->
+<div class="totalbar" id="totalbar" style="display:none">
+  <span class="total-label">Records loaded:</span>
+  <span class="total-value" id="total-count">—</span>
+  <span class="total-label" style="margin-left:14px">API total:</span>
+  <span class="total-value" id="api-total">—</span>
+  <div class="loadall-progress" id="la-progress">
+    <div class="progress-bar-wrap"><div class="progress-bar" id="la-bar" style="width:0%"></div></div>
+    <span class="progress-text" id="la-text">fetching…</span>
+  </div>
+  <div class="total-pager" id="view-pager">
+    <span class="total-label">View page:</span>
+    <button class="pager-btn" id="btn-vprev" onclick="viewPrev()" disabled>← Prev</button>
+    <span class="page-indicator" id="vpage-indicator">1 / 1</span>
+    <button class="pager-btn" id="btn-vnext" onclick="viewNext()" disabled>Next →</button>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="statsbar">
+  <div class="stat"><div class="stat-label">Status</div><div class="stat-value sv-idle" id="s-status">Idle</div></div>
+  <div class="stat"><div class="stat-label">Endpoint</div><div class="stat-value sv-idle" id="s-endpoint" style="font-size:12px;padding-top:3px">—</div></div>
+  <div class="stat"><div class="stat-label">Records</div><div class="stat-value sv-idle" id="s-items">0</div></div>
+  <div class="stat"><div class="stat-label">Total Fields</div><div class="stat-value sv-idle" id="s-keys">0</div></div>
+  <div class="stat"><div class="stat-label">Size</div><div class="stat-value sv-idle" id="s-size">0 KB</div></div>
+  <div class="stat"><div class="stat-label">Time</div><div class="stat-value sv-idle" id="s-time">— ms</div></div>
+</div>
+
+<!-- Viewer -->
+<div class="viewer">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-head">
+      JSON Paths
+      <span class="path-count" id="path-count">0 paths</span>
+    </div>
+    <div class="sidebar-actions">
+      <button onclick="checkAllPaths(true)">✓ All</button>
+      <button onclick="checkAllPaths(false)">✕ None</button>
+      <button onclick="checkObsoletePaths(false)">Hide obsolete</button>
+      <button onclick="checkOnlyValuePaths()">Values only</button>
+    </div>
+    <div class="sidebar-search">
+      <input type="text" id="path-search" placeholder="Filter paths…" oninput="filterPaths()">
+    </div>
+    <div class="path-list" id="path-list"></div>
+  </div>
+
+  <!-- JSON area -->
+  <div class="json-area">
+    <div class="json-toolbar">
+      <div class="json-path-display" id="json-path-label">No data loaded — select an endpoint above</div>
+      <div class="view-toggle">
+        <button class="active" id="vt-pretty" onclick="setView('pretty')">Pretty</button>
+        <button id="vt-raw"    onclick="setView('raw')">Raw</button>
+        <button id="vt-schema" onclick="setView('schema')">Schema</button>
+      </div>
+    </div>
+    <!-- Result pagination (shown when >20 records) -->
+    <div class="result-pager" id="result-pager">
+      <span>Showing records</span>
+      <strong id="rp-range">1–20</strong>
+      <span>of</span>
+      <strong id="rp-total">0</strong>
+      <button class="rp-btn" id="rp-prev" onclick="rpPrev()" disabled>← Prev 20</button>
+      <button class="rp-btn" id="rp-next" onclick="rpNext()">Next 20 →</button>
+      <span style="margin-left:auto;color:var(--dim);font-size:10px">Full data always stored</span>
+    </div>
+    <pre id="output">Ready. Select an endpoint above or type one and press Enter.</pre>
+  </div>
+</div>
+
+</div><!-- /app -->
+
+<!-- Floating trigger -->
+<button class="sel-trigger" id="sel-trigger" onclick="openSelPanel()">
+  ⎘ AI Context Buffer
+  <span class="sel-badge" id="sel-badge">0</span>
+</button>
+
+<!-- Overlay -->
+<div class="overlay" id="overlay" onclick="closeSelPanel()"></div>
+
+<!-- AI Context Buffer Panel -->
+<div class="sel-panel" id="sel-panel">
+  <div class="sel-panel-head">
+    <div class="sel-panel-title">⬡ AI Context Buffer</div>
+    <button class="sel-panel-close" onclick="closeSelPanel()">✕</button>
+  </div>
+
+  <div class="panel-tabs">
+    <button class="panel-tab active" id="tab-buf"     onclick="switchPanelTab('buf')">Context Buffer</button>
+    <button class="panel-tab"        id="tab-builder" onclick="switchPanelTab('builder')">AI Syntax Builder</button>
+  </div>
+
+  <!-- Tab: Context Buffer -->
+  <div class="panel-section active" id="ps-buf">
+    <div class="sel-items" id="sel-items">
+      <div class="sel-empty">No responses saved yet.<br><br>Load any endpoint, then click<br><strong style="color:var(--green)">+ Add to Context</strong> in the toolbar.</div>
+    </div>
+    <div class="sel-output" id="sel-output"></div>
+    <div class="sel-footer">
+      <div class="sel-footer-info" id="sel-footer-info">Tick responses to include them</div>
+      <button class="sel-copy-btn" id="sel-copy-btn" onclick="copySelected()" disabled>⎘ Copy Selected Context</button>
+      <button class="sel-clear-btn" onclick="clearSelected()">Clear all saved</button>
+    </div>
+  </div>
+
+  <!-- Tab: AI Syntax Builder -->
+  <div class="panel-section" id="ps-builder">
+    <div class="ai-builder">
+
+      <div class="ai-info">
+        Describe what you want to build. The generator will produce a <strong>complete, ready-to-host extension HTML file</strong> you can paste directly to any AI tool — or host immediately on GitHub Pages / Netlify.<br><br>
+        <strong>⚠ Developer tool:</strong> Best results require basic knowledge of APIs and JSON. <strong>Paid AI plans</strong> (Claude Pro, ChatGPT Plus) produce significantly better extensions than free tiers.
+      </div>
+
+      <!-- STEP 1: What to build -->
+      <div>
+        <div class="ai-section-label">① What do you want to build?</div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;flex-wrap:wrap;gap:5px" id="template-chips">
+            <button class="chip-btn" onclick="setTemplate('dashboard')">📊 Dashboard</button>
+            <button class="chip-btn" onclick="setTemplate('table')">📋 Data Table</button>
+            <button class="chip-btn" onclick="setTemplate('kpi')">🔢 KPI Cards</button>
+            <button class="chip-btn" onclick="setTemplate('chart')">📈 Chart</button>
+            <button class="chip-btn" onclick="setTemplate('search')">🔍 Search / Filter</button>
+            <button class="chip-btn" onclick="setTemplate('form')">✏️ Create / Edit Form</button>
+            <button class="chip-btn" onclick="setTemplate('export')">⬇️ CSV Export</button>
+            <button class="chip-btn" onclick="setTemplate('custom')">✨ Custom…</button>
+          </div>
+          <input id="ai-goal" type="text" placeholder="e.g. Dashboard showing total invoices, total value, top 5 customers"
+            style="width:100%;padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;margin-top:4px;">
+        </div>
+      </div>
+
+      <!-- STEP 2: Endpoints -->
+      <div>
+        <div class="ai-section-label">② Endpoints to use</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Currently loaded endpoint will be included. Add more from Context Buffer if needed.</div>
+        <div id="endpoint-list" style="display:flex;flex-direction:column;gap:4px;max-height:90px;overflow-y:auto;padding:2px"></div>
+        <div style="font-size:10px;color:var(--dim);margin-top:4px">Add more endpoints: load them &amp; click "+ Add to Context", then they appear here.</div>
+      </div>
+
+      <!-- STEP 3: Fields -->
+      <div>
+        <div class="ai-section-label">③ Key fields to use</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:5px">Selected in sidebar. <span id="field-count-badge" style="color:var(--accent2);font-weight:600">0 fields selected</span></div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap" id="field-tags"></div>
+      </div>
+
+      <!-- STEP 4: Style -->
+      <div>
+        <div class="ai-section-label">④ Visual style</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap" id="style-chips">
+          <button class="chip-btn chip-active" id="style-dark" onclick="setStyle('dark')">🌑 Dark</button>
+          <button class="chip-btn" id="style-light" onclick="setStyle('light')">☀️ Light</button>
+          <button class="chip-btn" id="style-minimal" onclick="setStyle('minimal')">⬜ Minimal</button>
+        </div>
+      </div>
+
+      <!-- STEP 5: Options -->
+      <div>
+        <div class="ai-section-label">⑤ Options</div>
+        <div class="ai-options">
+          <label class="ai-option"><input type="checkbox" id="ai-opt-schema" checked> Include full schema map in prompt</label>
+          <label class="ai-option"><input type="checkbox" id="ai-opt-samples" checked> Include sample values</label>
+          <label class="ai-option"><input type="checkbox" id="ai-opt-uuids"> Include UUID fields in schema</label>
+          <label class="ai-option"><input type="checkbox" id="ai-opt-skeleton" checked> Generate complete HTML skeleton (not just prompt)</label>
+          <label class="ai-option"><input type="checkbox" id="ai-opt-comments" checked> Add inline code comments</label>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:7px">
+        <button class="ai-generate-btn" id="ai-gen-btn" onclick="generateAIPrompt()" style="flex:1">⚡ Generate Complete Extension Prompt</button>
+      </div>
+
+      <div class="ai-output-area" style="display:flex;flex-direction:column;gap:5px">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 2px">
+          <span id="ai-output-label" style="font-size:10px;color:var(--dim);font-family:var(--mono)">Output will appear below</span>
+          <div style="display:flex;gap:4px">
+            <button class="ai-copy-btn" onclick="copyAIPrompt()" style="width:auto;padding:5px 11px;font-size:11px;margin:0">⎘ Copy</button>
+            <button class="ai-copy-btn" onclick="downloadExtension()" id="btn-download" style="width:auto;padding:5px 11px;font-size:11px;margin:0;color:var(--green);display:none">⬇ Download .html</button>
+          </div>
+        </div>
+        <textarea class="ai-output" id="ai-output" readonly placeholder="Your complete, copy-paste-ready AI prompt will appear here.&#10;&#10;It will contain:&#10;• Full Manager.io extension boilerplate&#10;• postMessage helper code&#10;• Your endpoint schema + sample values&#10;• Exact instructions for the AI to complete your feature&#10;&#10;Load an endpoint first, then click Generate."></textarea>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ══ HOW TO USE GUIDE OVERLAY ══ -->
+<div class="guide-overlay" id="guide-overlay" onclick="handleGuideOverlayClick(event)">
+<div class="guide-modal" id="guide-modal">
+
+  <div class="guide-header">
+    <div class="guide-title">📖 How to Use — Developer Toolkit</div>
+    <button class="guide-close" onclick="closeGuide()" title="Close">✕</button>
+  </div>
+
+  <div class="guide-body">
+
+    <div class="guide-intro">
+      This toolkit lets you <strong>explore any Manager.io API endpoint</strong>, inspect its data schema, then generate a <strong>complete AI prompt</strong> you paste into Claude, ChatGPT, or Gemini to receive a fully working extension — no coding required for basic use.<br><br>
+      <strong style="color:var(--amber)">⚠ Developer tool:</strong> This toolkit is designed for developers or technically minded users. Laypeople may find it difficult to get usable results without some understanding of APIs and JSON. <strong style="color:var(--accent2)">Paid AI plans consistently produce better results</strong> — see the disclaimer at the bottom of this guide.<br><br>
+      Follow the steps below, top to bottom.
+    </div>
+
+    <div class="guide-steps">
+
+      <!-- Step 1 -->
+      <div class="guide-step">
+        <div class="step-num sn-blue">1</div>
+        <div class="step-content">
+          <div class="step-title">Load an Endpoint</div>
+          <div class="step-desc">
+            Click any quick-access button in the bar below the input (Lists, Summaries, Reports), or type an endpoint name manually — e.g. <code>batch-sales-invoice</code> — and press Enter.<br><br>
+            Use <strong style="color:var(--accent2)">▶ Load</strong> for a quick preview (first page only), or <strong style="color:var(--purple)">⬇ Load All</strong> to fetch every record across all pages. Always use Load All before building a prompt.
+          </div>
+          <div class="step-tip">⚠ Manager.io returns max 50 records per API call. <strong>Load All</strong> follows every page automatically so you never miss fields that only appear later in the dataset.</div>
+          <div class="guide-pills" style="margin-top:8px">
+            <span class="guide-pill gp-blue">batch-customer</span>
+            <span class="guide-pill gp-blue">batch-sales-invoice</span>
+            <span class="guide-pill gp-blue">batch-inventory-item</span>
+            <span class="guide-pill gp-amber">aged-receivables</span>
+            <span class="guide-pill gp-amber">profit-and-loss-statement</span>
+            <span class="guide-pill gp-amber">balance-sheet</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="guide-step">
+        <div class="step-num sn-green">2</div>
+        <div class="step-content">
+          <div class="step-title">Select Fields in the Sidebar</div>
+          <div class="step-desc">
+            The left sidebar fills with every field found in the response — each shown with its path, data type badge, and a sample value.<br><br>
+            Tick the fields you want to include in your extension. Use the toolbar shortcuts:
+          </div>
+          <div class="guide-pills" style="margin-top:8px">
+            <span class="guide-pill gp-green">✓ All — select everything</span>
+            <span class="guide-pill gp-green">Values only — skip parent objects</span>
+            <span class="guide-pill gp-green">Hide obsolete — clean up old fields</span>
+          </div>
+          <div class="step-tip">💡 Click any field name to instantly copy its path to your clipboard.</div>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="guide-step">
+        <div class="step-num sn-purple">3</div>
+        <div class="step-content">
+          <div class="step-title">Open the AI Context Buffer &amp; Builder</div>
+          <div class="step-desc">
+            Click the floating <strong style="color:var(--accent2)">⎘ AI Context Buffer</strong> button in the bottom-right corner.<br><br>
+            • <strong style="color:var(--text)">Context Buffer tab</strong> — save the current response so you can load a second endpoint and combine both in one prompt.<br>
+            • <strong style="color:var(--text)">AI Syntax Builder tab</strong> — this is where you build the prompt. Switch to it.
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="guide-step">
+        <div class="step-num sn-amber">4</div>
+        <div class="step-content">
+          <div class="step-title">Fill in the AI Syntax Builder (5 sub-steps)</div>
+          <div class="step-desc">
+            <strong style="color:var(--text)">① What to build</strong> — pick a template preset or describe your goal in plain English.<br>
+            <div class="guide-pills" style="margin-top:5px;margin-bottom:8px">
+              <span class="guide-pill gp-blue">📊 Dashboard</span>
+              <span class="guide-pill gp-blue">📋 Data Table</span>
+              <span class="guide-pill gp-blue">🔢 KPI Cards</span>
+              <span class="guide-pill gp-blue">📈 Chart</span>
+              <span class="guide-pill gp-blue">🔍 Search / Filter</span>
+              <span class="guide-pill gp-blue">⬇️ CSV Export</span>
+              <span class="guide-pill gp-blue">✏️ Form</span>
+            </div>
+            <strong style="color:var(--text)">② Endpoints</strong> — your loaded endpoint is included automatically. Load extras &amp; add to Context if needed.<br><br>
+            <strong style="color:var(--text)">Load Full Dataset</strong> — use the sub-section inside ② to fetch all records so the schema is complete.<br><br>
+            <strong style="color:var(--text)">③ Fields</strong> — reflects your sidebar selections. Go back and adjust anytime.<br><br>
+            <strong style="color:var(--text)">④ Style</strong> — choose Dark, Light, or Minimal for the generated extension.<br><br>
+            <strong style="color:var(--text)">⑤ Options</strong> — keep "Include full schema" and "Generate HTML skeleton" checked for best results.
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 5 -->
+      <div class="guide-step">
+        <div class="step-num sn-green">5</div>
+        <div class="step-content">
+          <div class="step-title">Generate → Copy → Paste into AI → Install</div>
+          <div class="step-desc">
+            Click <strong style="color:var(--purple)">⚡ Generate Complete Extension Prompt</strong>.<br><br>
+            The text box fills with a complete, structured prompt containing your schema, sample values, boilerplate, and exact instructions for the AI.<br><br>
+            Click <strong style="color:var(--text)">⎘ Copy</strong>, then paste into <strong style="color:var(--accent2)">Claude</strong>, <strong style="color:var(--accent2)">ChatGPT</strong>, or <strong style="color:var(--accent2)">Gemini</strong>.<br><br>
+            The AI returns a complete <code>.html</code> file. Save it and upload it as a new Manager.io extension via <code>Settings → Extensions → Add Custom Extension</code>.
+          </div>
+          <div class="step-tip">✅ A good prompt is typically 3,000–8,000 characters. The label above the output box shows the exact count.</div>
+        </div>
+      </div>
+
+      <!-- Step 6 — GitHub Pages Deploy -->
+      <div class="guide-step">
+        <div class="step-num sn-blue">6</div>
+        <div class="step-content">
+          <div class="step-title">Deploy on GitHub Pages (free hosting)</div>
+          <div class="step-desc">
+            Once the AI gives you the <code>.html</code> file, you can host it for free on <strong style="color:var(--accent2)">GitHub Pages</strong> so your extension is always reachable from a public URL — which Manager.io can load directly.<br><br>
+            <strong style="color:var(--text)">Step-by-step:</strong><br><br>
+            <strong>① Create a GitHub account</strong> at <code>github.com</code> if you don't have one.<br><br>
+            <strong>② Create a new repository</strong> — click the <strong>+</strong> icon → <em>New repository</em>. Name it anything (e.g. <code>my-manager-extension</code>). Set it to <strong>Public</strong>. Click <em>Create repository</em>.<br><br>
+            <strong>③ Upload your file</strong> — on the repo page click <em>Add file → Upload files</em>. Drag your <code>.html</code> file in. <strong>Important:</strong> rename it <code>index.html</code> before uploading. Click <em>Commit changes</em>.<br><br>
+            <strong>④ Enable GitHub Pages</strong> — go to <em>Settings → Pages</em>. Under <em>Source</em> choose <strong>Deploy from a branch</strong>, select <code>main</code> branch and <code>/ (root)</code> folder. Click <em>Save</em>.<br><br>
+            <strong>⑤ Get your URL</strong> — GitHub will show a URL like <code>https://yourusername.github.io/my-manager-extension/</code>. It can take 1–2 minutes to go live.<br><br>
+            <strong>⑥ Install in Manager.io</strong> — go to <code>Settings → Extensions → Add Custom Extension</code> and paste that URL. Done.
+          </div>
+          <div class="step-tip">💡 To update the extension later, just upload a new <code>index.html</code> to the same repo. GitHub Pages refreshes automatically within a minute or two. You can also use <strong>Netlify</strong> or <strong>Vercel</strong> — just drag-and-drop the HTML file on their dashboard for an instant URL.</div>
+          <div class="guide-pills" style="margin-top:8px">
+            <span class="guide-pill gp-blue">github.com — free</span>
+            <span class="guide-pill gp-green">netlify.com — drag & drop</span>
+            <span class="guide-pill gp-green">vercel.com — instant deploy</span>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /guide-steps -->
+
+    <!-- ⚠ DISCLAIMER -->
+    <div style="background:rgba(255,185,64,.06);border:1px solid rgba(255,185,64,.25);border-radius:10px;padding:16px 18px;margin-top:4px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);margin-bottom:10px">⚠ Important Disclaimer — Please Read</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.75;display:flex;flex-direction:column;gap:8px">
+        <div><strong style="color:var(--text)">🛠 This is a developer-focused tool.</strong> Manager.io Developer Toolkit is designed for developers and technically minded users who understand APIs, JSON data, and basic web concepts. If you are not familiar with these, the results may be difficult to interpret or use.</div>
+        <div><strong style="color:var(--amber)">🤖 AI can and does make mistakes.</strong> The AI prompt generated by this tool is a best-effort starting point — it is not a guarantee. AI models (Claude, ChatGPT, Gemini, and others) may produce code that contains bugs, misinterprets field names, ignores edge cases, or simply does not work on the first attempt. <strong style="color:var(--text)">Always review and test the generated extension</strong> before relying on it for real business data.</div>
+        <div><strong style="color:var(--text)">📉 Output quality varies by AI model.</strong> Free tiers of AI tools have limited context windows and reasoning ability. <strong style="color:var(--accent2)">Paid / Pro versions</strong> — such as Claude Pro, ChatGPT Plus, or Gemini Advanced — consistently produce better, more complete, and less error-prone code for complex extensions. If a free model gives poor results, upgrading is often the fastest fix.</div>
+        <div><strong style="color:var(--text)">🔁 Iteration is normal.</strong> Even with a perfect prompt, complex extensions often need 2–3 rounds of refinement. Paste the AI's output back with a follow-up like <em>"The totals row is missing, please fix it"</em> to iterate. This is expected behaviour, not a failure.</div>
+        <div style="font-size:11px;color:var(--dim);border-top:1px solid var(--border);padding-top:8px;margin-top:2px">This tool is provided as-is. Use the generated code at your own discretion. Always keep a backup of your Manager.io data before installing any custom extension.</div>
+      </div>
+    </div>
+
+  </div><!-- /guide-body -->
+
+  <div class="guide-footer">
+    <span class="guide-footer-note">Manager.io Developer Toolkit · v1.0</span>
+    <button class="guide-footer-close" onclick="closeGuide()">✕ Got it, close</button>
+  </div>
+
+</div><!-- /guide-modal -->
+</div><!-- /guide-overlay -->
+
+<script>
+/* ══════════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════════ */
+let latestJson      = null;   // current page raw JSON
+let allRecords      = [];     // all records concatenated (Load All)
+let allPaths        = [];     // [{path,type,val,checked}]
+let currentView     = 'pretty';
+let savedItems      = [];     // [{name,json,records,size,selected}]
+let currentEndpoint = '';
+let loadAllActive   = false;
+let loadAllStop     = false;
+
+// Result pagination (UI paging of allRecords)
+const RP_SIZE = 20;
+let rpPage  = 0;   // 0-based
+
+// API page navigation
+let pageStack   = [];
+let currentNext = null;
+let currentPage = 1;
+
+/* ══════════════════════════════════════════════════════
+   CLOCK
+══════════════════════════════════════════════════════ */
+(function tick(){document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-GB');setTimeout(tick,1000);})();
+
+/* ══════════════════════════════════════════════════════
+   ROBUST CLIPBOARD — fallback to execCommand
+══════════════════════════════════════════════════════ */
+function robustCopy(text){
+  // Try modern API first
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    return navigator.clipboard.writeText(text).then(()=>true).catch(()=>execCopy(text));
+  }
+  return Promise.resolve(execCopy(text));
+}
+function execCopy(text){
+  try{
+    const ta=document.createElement('textarea');
+    ta.value=text;
+    ta.style.cssText='position:fixed;top:-9999px;left:-9999px;opacity:0;';
+    document.body.appendChild(ta);
+    ta.focus();ta.select();
+    const ok=document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  }catch(e){return false;}
+}
+
+/* ══════════════════════════════════════════════════════
+   postMessage
+══════════════════════════════════════════════════════ */
+function pmr(msg){
+  return new Promise((resolve,reject)=>{
+    const rid=crypto.randomUUID();
+    const timer=setTimeout(()=>{window.removeEventListener('message',h);reject(new Error('15s timeout — running inside Manager?'));},15000);
+    function h(e){
+      if(e.data?.type?.endsWith('-response')&&e.data?.requestId===rid){
+        clearTimeout(timer);window.removeEventListener('message',h);resolve(e.data.body);
+      }
+    }
+    window.addEventListener('message',h);
+    window.parent.postMessage({...msg,requestId:rid},'*');
+  });
+}
+
+/* ══════════════════════════════════════════════════════
+   HIGHLIGHT
+══════════════════════════════════════════════════════ */
+function hl(json){
+  const s=JSON.stringify(json,null,2).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return s.replace(/("(\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?|[{}\[\],])/g,m=>{
+    if(/^[{}\[\],]/.test(m))return`<span class="jp">${m}</span>`;
+    if(/^"/.test(m))return/:$/.test(m)?`<span class="jk">${m}</span>`:`<span class="js">${m}</span>`;
+    if(/true|false/.test(m))return`<span class="jb">${m}</span>`;
+    if(/null/.test(m))return`<span class="jl">${m}</span>`;
+    return`<span class="jn">${m}</span>`;
+  });
+}
+
+/* ══════════════════════════════════════════════════════
+   SCHEMA
+══════════════════════════════════════════════════════ */
+function buildSchema(v,d=0){
+  if(v===null)return'null';
+  if(Array.isArray(v))return v.length?`Array(${v.length}) [\n${' '.repeat((d+1)*2)}${buildSchema(v[0],d+1)}\n${' '.repeat(d*2)}]`:'Array(0)[]';
+  if(typeof v==='object'){
+    const lines=Object.keys(v).map(k=>`${' '.repeat((d+1)*2)}"${k}": ${buildSchema(v[k],d+1)}`);
+    return`{\n${lines.join(',\n')}\n${' '.repeat(d*2)}}`;
+  }
+  return`<${typeof v}>`;
+}
+
+/* ══════════════════════════════════════════════════════
+   PATHS — extract with type + sample value
+══════════════════════════════════════════════════════ */
+function typeTag(v){
+  if(v===null)return{type:'null',sample:'null',friendlyType:'Null'};
+  if(Array.isArray(v))return{type:'arr',sample:`arr(${v.length})`,friendlyType:'Array'};
+  if(typeof v==='object')return{type:'obj',sample:'{}',friendlyType:'Object'};
+  if(typeof v==='boolean')return{type:'bool',sample:String(v),friendlyType:'Boolean'};
+  if(typeof v==='number')return{type:'num',sample:String(v),friendlyType:'Number'};
+  const s=String(v);
+  // Detect UUID
+  const isUUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+  return{type:'str',sample:s.length>22?s.slice(0,22)+'…':s,friendlyType:isUUID?'UUID':'String',isUUID};
+}
+
+function extractPaths(obj){
+  const list=[];const seen=new Set();
+  function walk(v,path){
+    if(v&&typeof v==='object'&&list.length<1000){
+      for(const k of Object.keys(v).slice(0,200)){
+        const next=path?path+'.'+k:k;
+        if(seen.has(next))continue;seen.add(next);
+        const tag=typeTag(v[k]);
+        list.push({path:next,...tag,checked:true});
+        walk(v[k],next);
+      }
+    }
+  }
+  walk(obj,'');return list;
+}
+
+function renderPaths(list){
+  const box=document.getElementById('path-list');
+  box.innerHTML='';
+  document.getElementById('path-count').textContent=list.length+' paths';
+  list.slice(0,600).forEach(({path,type,sample,checked},idx)=>{
+    // find original index in allPaths
+    const origIdx=allPaths.findIndex(p=>p.path===path);
+    const d=document.createElement('div');
+    d.className='path-item';
+    d.innerHTML=`
+      <input type="checkbox" ${checked?'checked':''} onchange="togglePath(${origIdx},this)" onclick="event.stopPropagation()">
+      <span class="path-text" onclick="copyPathToClipboard('${path.replace(/'/g,"\\'")}')" title="Click to copy">${path}</span>
+      <span class="pt pt-${type}">${type}</span>
+      <span class="path-val" title="${sample}">${sample}</span>`;
+    box.appendChild(d);
+  });
+}
+
+function togglePath(idx,cb){
+  if(idx<0||idx>=allPaths.length)return;
+  allPaths[idx].checked=cb.checked;
+}
+
+function filterPaths(){
+  const q=document.getElementById('path-search').value.toLowerCase();
+  renderPaths(q?allPaths.filter(p=>p.path.toLowerCase().includes(q)):allPaths);
+}
+
+function checkAllPaths(state){
+  allPaths.forEach(p=>p.checked=state);
+  filterPaths();
+}
+function checkObsoletePaths(state){
+  allPaths.forEach(p=>{if(p.path.includes('obsolete'))p.checked=state;});
+  filterPaths();
+}
+function checkOnlyValuePaths(){
+  allPaths.forEach(p=>{p.checked=p.type!=='obj'&&p.type!=='arr';});
+  filterPaths();
+}
+
+function copyPathToClipboard(path){
+  robustCopy(path).then(()=>showToast('Copied: '+path.split('.').pop()));
+}
+
+/* ══════════════════════════════════════════════════════
+   STATS
+══════════════════════════════════════════════════════ */
+function countKeys(obj){let n=0;function w(v){if(v&&typeof v==='object'){for(const k in v){n++;w(v[k]);}}}w(obj);return n;}
+function getItems(d){
+  if(Array.isArray(d))return d;
+  if(d&&typeof d==='object'){
+    if(Array.isArray(d.items))return d.items;
+    for(const k of Object.keys(d))if(Array.isArray(d[k]))return d[k];
+  }
+  return[];
+}
+function extractTotal(d){
+  if(!d||typeof d!=='object')return null;
+  for(const k of['totalCount','total','count'])if(typeof d[k]==='number')return d[k];
+  if(d._metadata&&typeof d._metadata.totalCount==='number')return d._metadata.totalCount;
+  return null;
+}
+function extractNext(d){
+  if(!d||typeof d!=='object')return null;
+  if(d._links?.next?.href)return d._links.next.href;
+  if(d.nextPageToken)return d.nextPageToken;
+  return null;
+}
+function setStat(id,val,cls){
+  const el=document.getElementById(id);
+  if(cls)el.className='stat-value '+cls;
+  el.textContent=val;
+}
+
+/* ══════════════════════════════════════════════════════
+   RESULT PAGINATION (UI)
+══════════════════════════════════════════════════════ */
+function updateResultPager(){
+  const total=allRecords.length;
+  const pages=Math.ceil(total/RP_SIZE)||1;
+  rpPage=Math.min(rpPage,pages-1);
+  const pagerEl=document.getElementById('result-pager');
+  if(total>RP_SIZE){
+    pagerEl.classList.add('visible');
+    const from=rpPage*RP_SIZE+1, to=Math.min((rpPage+1)*RP_SIZE,total);
+    document.getElementById('rp-range').textContent=from+'–'+to;
+    document.getElementById('rp-total').textContent=total.toLocaleString();
+    document.getElementById('rp-prev').disabled=rpPage===0;
+    document.getElementById('rp-next').disabled=rpPage>=pages-1;
+  } else {
+    pagerEl.classList.remove('visible');
+  }
+}
+function rpPrev(){if(rpPage>0){rpPage--;renderCurrentView();updateResultPager();}}
+function rpNext(){const pages=Math.ceil(allRecords.length/RP_SIZE);if(rpPage<pages-1){rpPage++;renderCurrentView();updateResultPager();}}
+
+// Unused API-level pager (kept for compatibility)
+function viewPrev(){}
+function viewNext(){}
+
+/* ══════════════════════════════════════════════════════
+   VIEW RENDER
+══════════════════════════════════════════════════════ */
+function setView(v){
+  currentView=v;
+  ['pretty','raw','schema'].forEach(n=>document.getElementById('vt-'+n).classList.toggle('active',n===v));
+  if(latestJson)renderCurrentView();
+}
+
+function renderCurrentView(){
+  const pre=document.getElementById('output');
+  // If we have multiple records, show a page slice
+  let data=latestJson;
+  if(allRecords.length>RP_SIZE){
+    const slice=allRecords.slice(rpPage*RP_SIZE,(rpPage+1)*RP_SIZE);
+    // Wrap in same structure
+    data={_viewNote:`Showing records ${rpPage*RP_SIZE+1}–${Math.min((rpPage+1)*RP_SIZE,allRecords.length)} of ${allRecords.length} (full data stored)`,items:slice};
+  }
+  if(currentView==='pretty')pre.innerHTML=hl(data);
+  else if(currentView==='raw')pre.textContent=JSON.stringify(data);
+  else pre.textContent=buildSchema(data);
+}
+
+/* ══════════════════════════════════════════════════════
+   AFTER DATA LOAD — update all panels
+══════════════════════════════════════════════════════ */
+function processData(data, elapsed, endpoint){
+  latestJson=data;
+  const items=getItems(data);
+  // Accumulate records
+  if(items.length){
+    allRecords.push(...items);
+  } else {
+    allRecords=[]; // report/single
+  }
+
+  allPaths=extractPaths(data);
+  updateResultPager();
+  renderCurrentView();
+  renderPaths(allPaths);
+
+  const size=(JSON.stringify(data).length/1024).toFixed(1);
+  const apiTotal=extractTotal(data);
+  currentNext=extractNext(data);
+
+  setStat('s-status','200 OK','sv-ok');
+  setStat('s-items',allRecords.length||1);
+  setStat('s-keys',countKeys(data));
+  setStat('s-size',size+' KB');
+  if(elapsed!==null)setStat('s-time',elapsed+' ms');
+
+  // Total bar
+  const tbar=document.getElementById('totalbar');tbar.style.display='flex';
+  document.getElementById('total-count').textContent=
+    (allRecords.length||1).toLocaleString()+' loaded';
+  document.getElementById('api-total').textContent=
+    apiTotal!==null ? apiTotal.toLocaleString()+' total' : 'unknown';
+
+  document.getElementById('vpage-indicator').textContent=
+    currentPage+' / '+(currentNext?'…':'end');
+  document.getElementById('btn-vprev').disabled=currentPage<=1;
+  document.getElementById('btn-vnext').disabled=!currentNext;
+
+  renderSaveButton(endpoint,data);
+}
+
+/* ══════════════════════════════════════════════════════
+   LOAD SINGLE PAGE
+══════════════════════════════════════════════════════ */
+async function loadData(){
+  let raw=document.getElementById('path').value.trim();
+  if(!raw)return;
+  const ps=parseInt(document.getElementById('pagesize').value)||200;
+  raw=raw.replace(/^\/+/,'').replace(/^api4\//,'');
+  let fullPath='/api4/'+raw;
+  if(!fullPath.includes('?'))fullPath+='?PageSize='+ps;
+
+  currentEndpoint=raw;
+  allRecords=[];rpPage=0;
+  currentPage=1;pageStack=[];currentNext=null;
+  setStat('s-endpoint',raw);
+  document.getElementById('json-path-label').textContent='GET '+fullPath;
+  setStat('s-status','Loading…','sv-load');
+  const t0=performance.now();
+  try{
+    const data=await pmr({type:'api-request',method:'GET',path:fullPath});
+    processData(data,Math.round(performance.now()-t0),raw);
+  }catch(e){
+    setStat('s-status','Error','sv-err');
+    document.getElementById('output').textContent='Error: '+e.message;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   LOAD ALL — recursive fetch following next links
+══════════════════════════════════════════════════════ */
+async function loadAll(){
+  let raw=document.getElementById('path').value.trim();
+  if(!raw)return;
+  const ps=parseInt(document.getElementById('pagesize').value)||200;
+  raw=raw.replace(/^\/+/,'').replace(/^api4\//,'');
+  let startPath='/api4/'+raw;
+  if(!startPath.includes('?'))startPath+='?PageSize='+ps;
+
+  currentEndpoint=raw;
+  allRecords=[];rpPage=0;currentPage=1;pageStack=[];currentNext=null;
+  setStat('s-endpoint',raw);
+
+  // UI: show stop button, hide load buttons
+  document.getElementById('btn-load').style.display='none';
+  document.getElementById('btn-loadall').style.display='none';
+  document.getElementById('btn-stop').style.display='';
+  document.getElementById('la-progress').classList.add('active');
+  setStat('s-status','Fetching…','sv-load');
+
+  loadAllActive=true;loadAllStop=false;
+  let path=startPath;
+  let pageNum=0;
+  const t0=performance.now();
+
+  while(path&&!loadAllStop){
+    pageNum++;
+    document.getElementById('la-text').textContent=`page ${pageNum} · ${allRecords.length.toLocaleString()} records…`;
+    try{
+      const data=await pmr({type:'api-request',method:'GET',path:path});
+      const items=getItems(data);
+      if(items.length)allRecords.push(...items);
+      latestJson=data;
+
+      // progress bar (estimate based on api total)
+      const apiTotal=extractTotal(data);
+      if(apiTotal&&apiTotal>0){
+        const pct=Math.min(100,Math.round(allRecords.length/apiTotal*100));
+        document.getElementById('la-bar').style.width=pct+'%';
+        document.getElementById('api-total').textContent=apiTotal.toLocaleString()+' total';
+      }
+      document.getElementById('total-count').textContent=allRecords.length.toLocaleString()+' loaded';
+      document.getElementById('totalbar').style.display='flex';
+
+      const next=extractNext(data);
+      if(!next||items.length===0)break;
+      path=next;
+    }catch(e){
+      setStat('s-status','Error','sv-err');
+      document.getElementById('output').textContent='Load All error on page '+pageNum+': '+e.message;
+      break;
+    }
+  }
+
+  const elapsed=Math.round(performance.now()-t0);
+  loadAllActive=false;
+
+  // reset UI
+  document.getElementById('btn-load').style.display='';
+  document.getElementById('btn-loadall').style.display='';
+  document.getElementById('btn-stop').style.display='none';
+  document.getElementById('la-progress').classList.remove('active');
+  document.getElementById('la-bar').style.width='0%';
+
+  // Build a synthetic combined response for display
+  const combined={_loadAllSummary:{endpoint:raw,totalRecordsLoaded:allRecords.length,pagesRequested:pageNum,elapsedMs:elapsed,stoppedEarly:loadAllStop},items:allRecords};
+  allPaths=extractPaths(combined);
+  renderCurrentView();updateResultPager();renderPaths(allPaths);
+
+  setStat('s-status',loadAllStop?'Stopped':'Complete','sv-ok');
+  setStat('s-items',allRecords.length);
+  setStat('s-keys',countKeys(combined));
+  setStat('s-size',(JSON.stringify(combined).length/1024).toFixed(1)+' KB');
+  setStat('s-time',elapsed+' ms');
+  document.getElementById('total-count').textContent=allRecords.length.toLocaleString()+' loaded';
+  document.getElementById('vpage-indicator').textContent='All / done';
+  document.getElementById('btn-vnext').disabled=true;
+
+  renderSaveButton(raw,combined);
+  showToast((loadAllStop?'Stopped at ':'Loaded all ')+allRecords.length.toLocaleString()+' records');
+}
+
+function stopLoadAll(){loadAllStop=true;showToast('Stopping after current page…');}
+
+/* ══════════════════════════════════════════════════════
+   QUICK BUTTONS
+══════════════════════════════════════════════════════ */
+function quick(ep){
+  document.getElementById('path').value=ep;loadData();
+}
+function quickReport(ep){
+  document.getElementById('path').value=ep;
+  currentEndpoint=ep;allRecords=[];rpPage=0;
+  setStat('s-endpoint',ep);
+  const fullPath='/api4/'+ep;
+  document.getElementById('json-path-label').textContent='GET '+fullPath;
+  setStat('s-status','Loading…','sv-load');
+  const t0=performance.now();
+  pmr({type:'api-request',method:'GET',path:fullPath}).then(data=>{
+    processData(data,Math.round(performance.now()-t0),ep);
+  }).catch(e=>{
+    setStat('s-status','Error','sv-err');
+    document.getElementById('output').textContent='Error: '+e.message;
+  });
+}
+
+/* ══════════════════════════════════════════════════════
+   SAVE BUTTON IN TOOLBAR
+══════════════════════════════════════════════════════ */
+function renderSaveButton(ep,data){
+  const old=document.getElementById('toolbar-save');if(old)old.remove();
+  const btn=document.createElement('button');
+  btn.id='toolbar-save';
+  btn.style.cssText='background:rgba(61,255,160,.15);border:1px solid rgba(61,255,160,.3);border-radius:6px;color:#3dffa0;font-family:var(--mono);font-size:11px;padding:4px 10px;cursor:pointer;white-space:nowrap;transition:all .14s;margin-left:4px;';
+  btn.textContent='+ Add to Context';
+  btn.onclick=()=>saveItem(ep,data,btn);
+  document.querySelector('.json-toolbar').appendChild(btn);
+}
+
+/* ══════════════════════════════════════════════════════
+   CONTEXT BUFFER
+══════════════════════════════════════════════════════ */
+function saveItem(ep,data,btn){
+  if(savedItems.find(i=>i.name===ep)){showToast('Already in buffer: '+ep);return;}
+  const records=allRecords.length||getItems(data).length||1;
+  const size=(JSON.stringify(data).length/1024).toFixed(1);
+  savedItems.push({name:ep,json:data,records,size,selected:false});
+  btn.textContent='✓ In Buffer';btn.style.background='rgba(61,255,160,.3)';btn.disabled=true;
+  updateSelBadge();renderSelItems();
+  showToast('Added "'+ep+'" to AI Context Buffer');
+}
+
+function updateSelBadge(){
+  const checked=savedItems.filter(i=>i.selected).length;
+  document.getElementById('sel-badge').textContent=savedItems.length;
+  document.getElementById('sel-copy-btn').disabled=checked===0;
+  document.getElementById('sel-footer-info').textContent=
+    checked?checked+' of '+savedItems.length+' selected':'Tick responses to include them';
+}
+
+function renderSelItems(){
+  const box=document.getElementById('sel-items');
+  if(!savedItems.length){
+    box.innerHTML='<div class="sel-empty">No responses saved yet.<br><br>Load any endpoint, then click<br><strong style="color:var(--green)">+ Add to Context</strong> in the toolbar.</div>';
+    return;
+  }
+  box.innerHTML='';
+  savedItems.forEach((item,i)=>{
+    const preview=JSON.stringify(item.json).slice(0,100)+'…';
+    const div=document.createElement('div');
+    div.className='sel-item'+(item.selected?' checked':'');
+    div.innerHTML=`
+      <input type="checkbox" ${item.selected?'checked':''} onchange="toggleSel(${i},this)">
+      <div class="sel-item-body">
+        <div class="sel-item-name">/api4/${item.name}</div>
+        <div class="sel-item-preview">${preview}</div>
+        <div class="sel-item-meta">${item.records} records · ${item.size} KB</div>
+      </div>
+      <button onclick="removeSel(${i})" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:14px;padding:2px 4px;border-radius:4px">✕</button>`;
+    box.appendChild(div);
+  });
+}
+
+function toggleSel(i,cb){
+  savedItems[i].selected=cb.checked;
+  cb.closest('.sel-item').classList.toggle('checked',cb.checked);
+  updateSelBadge();
+  const selected=savedItems.filter(x=>x.selected);
+  const outEl=document.getElementById('sel-output');
+  if(selected.length){
+    outEl.classList.add('visible');
+    const combined={};selected.forEach(s=>combined[s.name]=s.json);
+    const text=JSON.stringify(combined,null,2);
+    outEl.textContent=text.slice(0,3000)+(text.length>3000?'\n\n…(truncated preview — full JSON will be copied)':'');
+  } else outEl.classList.remove('visible');
+}
+
+function removeSel(i){savedItems.splice(i,1);renderSelItems();updateSelBadge();}
+
+function clearSelected(){
+  savedItems=[];renderSelItems();updateSelBadge();
+  document.getElementById('sel-output').classList.remove('visible');
+}
+
+function copySelected(){
+  const selected=savedItems.filter(i=>i.selected);
+  if(!selected.length){showToast('Nothing selected');return;}
+  const combined={};selected.forEach(s=>combined[s.name]=s.json);
+  robustCopy(JSON.stringify(combined,null,2)).then(ok=>{
+    if(ok!==false)showToast('Copied '+selected.length+' endpoint(s) to clipboard');
+    else showToast('Copy failed — try right-click copy from the preview');
+    closeSelPanel();
+  });
+}
+
+/* ══════════════════════════════════════════════════════
+   AI SYNTAX BUILDER — UPGRADED
+══════════════════════════════════════════════════════ */
+let selectedStyle = 'dark';
+let selectedTemplate = '';
+
+function setTemplate(t){
+  selectedTemplate = t;
+  document.querySelectorAll('#template-chips .chip-btn').forEach(b=>b.classList.remove('chip-active'));
+  event.target.classList.add('chip-active');
+  const presets = {
+    dashboard: 'Dashboard showing total count, total value, and summary statistics',
+    table: 'Searchable, sortable data table with all key fields',
+    kpi: 'KPI cards showing key metrics with labels and values',
+    chart: 'Bar or line chart visualizing key numeric fields over time or by category',
+    search: 'Search and filter interface with real-time results',
+    form: 'Form to create or edit a record with validation',
+    export: 'Table with CSV export button for all records',
+    custom: ''
+  };
+  if(t !== 'custom') document.getElementById('ai-goal').value = presets[t] || '';
+  if(t === 'custom') document.getElementById('ai-goal').focus();
+}
+
+function setStyle(s){
+  selectedStyle = s;
+  ['dark','light','minimal'].forEach(n=>document.getElementById('style-'+n).classList.toggle('chip-active', n===s));
+}
+
+// Called when builder tab is opened — refresh field tags + endpoint list
+function refreshBuilderPanel(){
+  // Field tags
+  const incUUIDs = document.getElementById('ai-opt-uuids').checked;
+  let paths = allPaths.filter(p=>p.checked && p.type!=='obj' && p.type!=='arr');
+  if(!incUUIDs) paths = paths.filter(p=>!p.isUUID);
+  paths = paths.filter(p=>!p.path.includes('obsolete'));
+
+  const badge = document.getElementById('field-count-badge');
+  if(badge) badge.textContent = paths.length + ' fields selected';
+
+  const tagBox = document.getElementById('field-tags');
+  if(tagBox){
+    tagBox.innerHTML = '';
+    paths.slice(0,18).forEach(({path})=>{
+      const el = document.createElement('span');
+      el.className = 'field-tag';
+      el.textContent = path.split('.').pop();
+      el.title = path;
+      tagBox.appendChild(el);
+    });
+    if(paths.length > 18){
+      const el = document.createElement('span');
+      el.className = 'field-tag';
+      el.style.background = 'rgba(74,144,255,.1)';
+      el.style.borderColor = 'rgba(74,144,255,.2)';
+      el.style.color = 'var(--accent2)';
+      el.textContent = '+ '+(paths.length-18)+' more';
+      tagBox.appendChild(el);
+    }
+  }
+
+  // Endpoint list
+  const epBox = document.getElementById('endpoint-list');
+  if(epBox){
+    epBox.innerHTML = '';
+    const eps = [];
+    if(currentEndpoint) eps.push(currentEndpoint);
+    savedItems.forEach(s=>{ if(s.name !== currentEndpoint) eps.push(s.name); });
+    eps.forEach(ep=>{
+      const el = document.createElement('div');
+      el.className = 'ep-tag';
+      el.innerHTML = `<span class="ep-tag-dot"></span>/api4/${ep}`;
+      epBox.appendChild(el);
+    });
+    if(!eps.length){
+      epBox.innerHTML = '<div style="font-size:11px;color:var(--dim);padding:4px">No endpoint loaded yet</div>';
+    }
+  }
+}
+
+function generateAIPrompt(){
+  if(!latestJson && !allRecords.length){ showToast('Load an endpoint first'); return; }
+
+  refreshBuilderPanel();
+
+  const incSchema   = document.getElementById('ai-opt-schema').checked;
+  const incSamples  = document.getElementById('ai-opt-samples').checked;
+  const incUUIDs    = document.getElementById('ai-opt-uuids').checked;
+  const incSkeleton = document.getElementById('ai-opt-skeleton').checked;
+  const incComments = document.getElementById('ai-opt-comments').checked;
+  const goal        = document.getElementById('ai-goal').value.trim() || 'dashboard showing key data from this endpoint';
+
+  // Collect endpoints
+  const eps = [];
+  if(currentEndpoint) eps.push({ name: currentEndpoint, json: latestJson, records: allRecords });
+  savedItems.forEach(s=>{ if(s.name !== currentEndpoint) eps.push({ name: s.name, json: s.json, records: [] }); });
+
+  // Filter paths
+  let paths = allPaths.filter(p => p.checked && p.type !== 'obj' && p.type !== 'arr');
+  if(!incUUIDs) paths = paths.filter(p => !p.isUUID);
+  paths = paths.filter(p => !p.path.includes('obsolete'));
+
+  // Style theme values
+  const themes = {
+    dark:    { bg:'#0d1117', surface:'#161b22', text:'#e6edf3', accent:'#58a6ff', muted:'#8b949e', border:'#30363d', green:'#3fb950', red:'#f85149', font:'system-ui,sans-serif' },
+    light:   { bg:'#ffffff', surface:'#f6f8fa', text:'#24292f', accent:'#0969da', muted:'#57606a', border:'#d0d7de', green:'#1a7f37', red:'#cf222e', font:'system-ui,sans-serif' },
+    minimal: { bg:'#fafafa', surface:'#ffffff', text:'#111827', accent:'#6366f1', muted:'#6b7280', border:'#e5e7eb', green:'#059669', red:'#dc2626', font:'Inter,system-ui,sans-serif' }
+  };
+  const T = themes[selectedStyle] || themes.dark;
+
+  // Helper: build schema block for one endpoint
+  function schemaBlock(epName, epPaths){
+    let s = `  Endpoint: /api4/${epName}\n`;
+    s += `  Fields available (dot-notation path | type${incSamples?' | sample':''})\n`;
+    let lastTop = '';
+    epPaths.forEach(({path, friendlyType, sample})=>{
+      const top = path.split('.')[0];
+      if(top !== lastTop){ s += `\n    [${top}]\n`; lastTop = top; }
+      const sv = incSamples ? `  →  ${sample}` : '';
+      s += `      ${path.padEnd(42,' ')} ${friendlyType}${sv}\n`;
+    });
+    return s;
+  }
+
+  // Build access-pattern code for primary endpoint
+  const fnName = 'get' + toPascal(currentEndpoint);
+  const primaryPaths = paths.slice(0, 12);
+
+  // Generate the full skeleton HTML if requested
+  let skeletonSection = '';
+  if(incSkeleton){
+    const pathsForSkeleton = paths.slice(0,20).map(p=>`      // ${p.path}`).join('\n');
+    const loopField = paths.find(p=>p.type==='str' && !p.isUUID && p.path.split('.').length<=2);
+    const numFields = paths.filter(p=>p.type==='num').slice(0,3);
+    const labelField = loopField ? loopField.path : 'items[0]?.key';
+    const valueField = numFields[0] ? numFields[0].path : null;
+
+  skeletonSection = `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  COMPLETE EXTENSION SKELETON — FILL IN THE ??? SECTIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+The following is a complete, working Manager.io extension HTML file.
+Replace every ??? comment with real implementation matching the schema above.
+The postMessage helper, the paginated fetch function, and the Load button are
+ALREADY CORRECT AND COMPLETE — do not modify them.
+Only implement the render(items) function and the UI sections marked with ???.
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${goal}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: ${T.font}; background: ${T.bg}; color: ${T.text}; min-height: 100vh; padding: 20px; }
+
+  /* ── loader / control bar ── */
+  .ctrl-bar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 12px 16px; margin-bottom: 18px;
+    background: ${T.surface}; border: 1px solid ${T.border}; border-radius: 10px;
+  }
+  .load-btn {
+    padding: 8px 20px; border: none; border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 700;
+    background: ${T.accent}; color: #fff; white-space: nowrap; transition: opacity .15s;
+  }
+  .load-btn:disabled { opacity: .45; cursor: not-allowed; }
+  .progress-wrap { flex: 1; min-width: 120px; height: 6px; background: ${T.border}; border-radius: 3px; overflow: hidden; }
+  .progress-bar  { height: 100%; width: 0%; background: ${T.accent}; border-radius: 3px; transition: width .25s; }
+  .status-text   { font-size: 12px; color: ${T.muted}; white-space: nowrap; }
+  .error-box { color: ${T.red}; background: ${T.surface}; border: 1px solid ${T.border};
+    border-radius: 8px; padding: 12px 16px; font-size: 13px; margin-bottom: 16px; }
+
+  /* ??? Add your component styles here */
+</style>
+</head>
+<body>
+
+<!-- Control bar — always visible. User presses Load to fetch all records. -->
+<div class="ctrl-bar">
+  <button class="load-btn" id="load-btn" onclick="loadAllRecords()">⬇ Load All Records</button>
+  <div class="progress-wrap"><div class="progress-bar" id="prog-bar"></div></div>
+  <span class="status-text" id="status-text">Press Load to fetch data from Manager</span>
+</div>
+
+<!-- ??? Add your HTML structure here (cards, table, chart container, etc.) -->
+<div id="app"></div>
+
+<script>
+/* ══════════════════════════════════════════════
+   postMessage helper — DO NOT MODIFY
+══════════════════════════════════════════════ */
+function postMessageWithResponse(message) {
+  return new Promise((resolve, reject) => {
+    const requestId = crypto.randomUUID();
+    const timer = setTimeout(() => {
+      window.removeEventListener('message', handler);
+      reject(new Error('Timeout — is this running inside Manager?'));
+    }, 15000);
+    function handler(event) {
+      if (event.data?.type?.endsWith('-response') && event.data?.requestId === requestId) {
+        clearTimeout(timer);
+        window.removeEventListener('message', handler);
+        resolve(event.data.body);
+      }
+    }
+    window.addEventListener('message', handler);
+    window.parent.postMessage({ ...message, requestId }, '*');
+  });
+}
+
+/* ══════════════════════════════════════════════
+   ${fnName} — fetches ALL pages automatically — DO NOT SIMPLIFY
+   Manager.io returns ≤50 records per API call.
+   This loop follows next_page_token until every record is loaded.
+   Removing or collapsing this into a single fetch will silently
+   cap results at 50 records regardless of dataset size.
+══════════════════════════════════════════════ */
+async function ${fnName}(onProgress) {
+  const allItems = [];
+  let nextToken  = null;
+  let pageNum    = 0;
+  let apiTotal   = null;
+
+  do {
+    /* PageSize=99999 asks for the largest batch the server will allow per page */
+    const path = nextToken
+      ? '/api4/${currentEndpoint}?PageSize=99999&next_page_token=' + encodeURIComponent(nextToken)
+      : '/api4/${currentEndpoint}?PageSize=99999';
+
+    const data = await postMessageWithResponse({ type: 'api-request', method: 'GET', path });
+
+    /* Normalise — endpoint may return { items:[…] } or a plain array */
+    const page = Array.isArray(data) ? data : (data.items || []);
+    allItems.push(...page);
+
+    /* Support all pagination token variants Manager uses */
+    nextToken = data.next_page_token || data.nextPageToken
+      || data._links?.next?.href || null;
+
+    /* Grab total count once for progress bar */
+    if (apiTotal === null) {
+      apiTotal = data.totalCount ?? data.total ?? data.count
+        ?? data._metadata?.totalCount ?? null;
+    }
+
+    pageNum++;
+    if (onProgress) onProgress(allItems.length, apiTotal, pageNum);
+
+    if (pageNum >= 1000) break; /* hard safety cap */
+
+  } while (nextToken);
+
+  return allItems;
+}
+
+/* ══════════════════════════════════════════════
+   loadAllRecords — wired to the Load button
+══════════════════════════════════════════════ */
+async function loadAllRecords() {
+  const btn    = document.getElementById('load-btn');
+  const bar    = document.getElementById('prog-bar');
+  const status = document.getElementById('status-text');
+  const app    = document.getElementById('app');
+
+  btn.disabled = true;
+  btn.textContent = 'Loading…';
+  bar.style.width = '0%';
+  app.innerHTML = '';
+
+  try {
+    const items = await ${fnName}((loaded, total, page) => {
+      status.textContent = total
+        ? \`Page \${page} · \${loaded.toLocaleString()} / \${total.toLocaleString()} records\`
+        : \`Page \${page} · \${loaded.toLocaleString()} records loaded…\`;
+      if (total) bar.style.width = Math.min(95, Math.round(loaded / total * 100)) + '%';
+    });
+
+    bar.style.width = '100%';
+    status.textContent = \`✓ \${items.length.toLocaleString()} records loaded\`;
+    btn.textContent = '↺ Reload';
+    btn.disabled = false;
+
+    render(items);
+
+  } catch (err) {
+    status.textContent = '⚠ ' + err.message;
+    btn.textContent = '↺ Retry';
+    btn.disabled = false;
+    app.innerHTML = \`<div class="error-box">⚠ \${err.message}<br><small>Make sure this extension is running inside Manager.io</small></div>\`;
+  }
+}
+
+/* ══════════════════════════════════════════════
+   render(items) — IMPLEMENT THIS FUNCTION
+   items = flat array of all records from /api4/${currentEndpoint}
+══════════════════════════════════════════════ */
+function render(items) {
+  const app = document.getElementById('app');
+
+  /*
+   ??? IMPLEMENT YOUR UI HERE
+
+   items is the complete dataset — every record, all pages fetched.
+
+   Available fields on each item (from schema above):
+${pathsForSkeleton}
+
+   Goal: ${goal}
+
+   Access pattern examples:
+${primaryPaths.slice(0,6).map(({path})=>{
+  const parts = path.split('.');
+  return `   //   item.${parts[0]}${parts.slice(1).map(p=>`?.${p}`).join('')}`;
+}).join('\n')}
+
+   Useful snippets:
+   const total   = items.length;
+   const sum     = items.reduce((a,b) => a + (b.${valueField||'amount'}||0), 0);
+   const fmt     = v => '$' + (v||0).toLocaleString(undefined,{minimumFractionDigits:2});
+   const grouped = items.reduce((m,i)=>{ const k=i.someKey; (m[k]=m[k]||[]).push(i); return m; },{});
+   const sorted  = [...items].sort((a,b)=>(b.${valueField||'amount'}||0)-(a.${valueField||'amount'}||0));
+  */
+
+  app.innerHTML = \`<p style="color:${T.muted};padding:20px">??? Implement render(items) above — \${items.length} records available</p>\`;
+}
+<\/script>
+</body>
+</html>`;
+  }
+
+  // Assemble the full prompt
+  let out = '';
+  out += `╔═══════════════════════════════════════════════════════════╗\n`;
+  out += `  MANAGER.IO EXTENSION — COMPLETE BUILD PROMPT\n`;
+  out += `╚═══════════════════════════════════════════════════════════╝\n\n`;
+
+  out += `TASK\n────\n`;
+  out += `Build a complete, working Manager.io browser extension.\n`;
+  out += `Goal: ${goal}\n`;
+  out += `Visual style: ${selectedStyle}\n`;
+  out += `Primary endpoint: /api4/${currentEndpoint}\n`;
+  if(eps.length > 1) out += `Additional endpoints: ${eps.slice(1).map(e=>'/api4/'+e.name).join(', ')}\n`;
+  out += `\n`;
+
+  out += `MANAGER.IO EXTENSION RULES\n──────────────────────────\n`;
+  out += `1. An extension is a SINGLE self-contained HTML file.\n`;
+  out += `2. It is loaded inside an <iframe> by Manager.\n`;
+  out += `3. To call the Manager API, use postMessageWithResponse() — the exact\n`;
+  out += `   implementation is shown in the skeleton below. DO NOT change it.\n`;
+  out += `4. The path /api4/ENDPOINT is automatically scoped to the current business.\n`;
+  out += `5. No backend, no npm, no build step — pure HTML/CSS/JS only.\n`;
+  out += `6. You may use CDN libraries (Chart.js, etc.) via <script src="…"> tags.\n`;
+  out += `7. PAGINATION IS REQUIRED: The API returns max 50 records per page.\n`;
+  out += `   The fetch function in the skeleton already handles this automatically\n`;
+  out += `   by looping through pages using next_page_token until all records are loaded.\n`;
+  out += `   DO NOT simplify it to a single fetch — that will silently drop data.\n\n`;
+
+  if(incSchema){
+    out += `DATA SCHEMA\n───────────\n`;
+    out += schemaBlock(currentEndpoint, paths);
+    savedItems.forEach(s=>{
+      const sPaths = [];
+      function walkForPaths(obj, prefix){
+        if(!obj||typeof obj!=='object')return;
+        for(const k of Object.keys(obj).slice(0,100)){
+          const val = obj[k];
+          const p = prefix ? prefix+'.'+k : k;
+          const tag = typeTag(val);
+          if(tag.type!=='obj'&&tag.type!=='arr') sPaths.push({path:p, friendlyType:tag.friendlyType, sample:tag.sample});
+          else walkForPaths(val, p);
+        }
+      }
+      const items2 = getItems(s.json);
+      if(items2.length) walkForPaths(items2[0],'');
+      else walkForPaths(s.json,'');
+      if(sPaths.length){
+        out += `\n`;
+        out += schemaBlock(s.name, sPaths.slice(0,40));
+      }
+    });
+    out += `\n`;
+  }
+
+  out += skeletonSection;
+
+  out += `\n\nFINAL INSTRUCTIONS — READ EVERY LINE BEFORE WRITING A SINGLE CHARACTER\n────────────────────────────────────────────────────────────────────────\n`;
+  out += `OUTPUT FORMAT\n`;
+  out += `• Return ONLY the raw, complete HTML file — starting with <!doctype html>.\n`;
+  out += `• Do NOT wrap the output in markdown fences (\`\`\`html … \`\`\`). Do NOT add\n`;
+  out += `  any preamble, summary, explanation, or trailing notes. Just the HTML.\n\n`;
+  out += `ARCHITECTURE RULES — NON-NEGOTIABLE\n`;
+  out += `• The extension is a SINGLE, self-contained HTML file rendered inside a\n`;
+  out += `  Manager.io <iframe>. No external servers. No build step. No npm.\n`;
+  out += `• All JavaScript and CSS must be inline in the same file.\n`;
+  out += `• You MAY load CDN libraries (e.g. Chart.js, Fuse.js) via <script src>.\n`;
+  out += `• postMessageWithResponse() is the ONLY way to call the Manager API.\n`;
+  out += `  Copy the exact implementation from the skeleton. Do NOT rewrite it.\n\n`;
+  out += `PAGINATION — CRITICAL — DO NOT SIMPLIFY\n`;
+  out += `• Manager.io returns at most 50 records per request. A single fetch will\n`;
+  out += `  silently return only the first page — causing wrong totals and missing data.\n`;
+  out += `• The skeleton fetch function loops through all pages using the token fields:\n`;
+  out += `  next_page_token  /  nextPageToken  /  _links.next.href\n`;
+  out += `• Keep this loop 100% intact. Do NOT replace it with a single fetch call.\n`;
+  out += `• The onProgress callback must remain wired so the loader bar updates.\n\n`;
+  out += `LOADER BAR\n`;
+  out += `• The elements #loader, #loader-bar, and #loader-text are already in the\n`;
+  out += `  skeleton. Show them while fetching. Hide them (display:none) once\n`;
+  out += `  render(items) finishes. Never remove these elements.\n\n`;
+  out += `GOAL — IMPLEMENT THIS COMPLETELY\n`;
+  out += `• Goal: ${goal}\n`;
+  out += `• Do not leave placeholder comments or stub functions. The render(items)\n`;
+  out += `  function must be fully implemented and produce a working, usable UI.\n\n`;
+  out += `VISUAL QUALITY — ${selectedStyle.toUpperCase()} THEME\n`;
+  out += `• Apply the ${selectedStyle} theme consistently across all elements.\n`;
+  out += `• The UI must look polished and production-ready — not like a prototype.\n`;
+  out += `• Use proper spacing, readable typography, hover states, and visual hierarchy.\n`;
+  out += `• Numbers should be formatted with locale separators. Dates human-readable.\n`;
+  out += `• Currency values must include the correct symbol and 2 decimal places.\n\n`;
+  out += `ROBUSTNESS — HANDLE EVERY EDGE CASE\n`;
+  out += `• Empty dataset: show a clear empty-state message, not a blank screen.\n`;
+  out += `• API errors: catch all rejections and display a user-friendly error panel.\n`;
+  out += `• Single-record responses: the UI must not break when items.length === 1.\n`;
+  out += `• Null / undefined fields: use optional chaining (?.) and nullish fallbacks.\n`;
+  out += `• Division by zero: guard all percentage and average calculations.\n\n`;
+  if(incComments) out += `CODE CLARITY\n• Add brief inline comments above each major section (fetch, render, helpers).\n\n`;
+  out += `FIELD ACCESS — USE EXACT PATHS FROM SCHEMA\n`;
+  out += `• Use the field paths exactly as shown in the DATA SCHEMA section above.\n`;
+  out += `• Prefer optional chaining: item.customer?.name rather than item.customer.name.\n`;
+  out += `• Do not invent field names that are not listed in the schema.\n\n`;
+  out += `SELF-CHECK BEFORE FINISHING\n`;
+  out += `Before returning the final file, mentally verify:\n`;
+  out += `  ✓ Does the file start with <!doctype html> and contain no markdown fences?\n`;
+  out += `  ✓ Is postMessageWithResponse() copied verbatim from the skeleton?\n`;
+  out += `  ✓ Is the full pagination loop present and untouched?\n`;
+  out += `  ✓ Is render(items) fully implemented (not a stub)?\n`;
+  out += `  ✓ Are all edge cases (empty, error, single record) handled?\n`;
+  out += `  ✓ Does the UI match the ${selectedStyle} theme and look production-ready?\n`;
+
+  document.getElementById('ai-output').value = out;
+  document.getElementById('ai-output-label').textContent =
+    `${out.length.toLocaleString()} chars · ${paths.length} fields · ready to paste into any AI`;
+  document.getElementById('btn-download').style.display = 'inline-block';
+  showToast('Prompt generated — ' + paths.length + ' fields, ' + out.length.toLocaleString() + ' chars');
+}
+
+function toPascal(str){
+  return (str||'').split(/[-_]/).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join('');
+}
+
+function copyAIPrompt(){
+  const text = document.getElementById('ai-output').value;
+  if(!text.trim()){ showToast('Generate a prompt first'); return; }
+  robustCopy(text).then(ok=>{
+    showToast(ok!==false ? '✓ Prompt copied — paste into Claude, ChatGPT, or Gemini!' : 'Copy failed — select all and Ctrl+C');
+  });
+}
+
+function downloadExtension(){
+  const text = document.getElementById('ai-output').value;
+  if(!text.trim()){ showToast('Generate a prompt first'); return; }
+  // Try to extract just the HTML skeleton portion if present
+  const htmlStart = text.indexOf('<!doctype html>');
+  const blob = new Blob([htmlStart>=0 ? text.slice(htmlStart) : text], {type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (currentEndpoint||'extension').replace(/[^a-z0-9-]/gi,'-') + '-extension.html';
+  a.click();
+  showToast('Skeleton downloaded!');
+}
+
+/* ══════════════════════════════════════════════════════
+   PANEL TABS
+══════════════════════════════════════════════════════ */
+function switchPanelTab(name){
+  ['buf','builder'].forEach(n=>{
+    document.getElementById('tab-'+n).classList.toggle('active',n===name);
+    document.getElementById('ps-'+n).classList.toggle('active',n===name);
+  });
+  if(name==='builder') refreshBuilderPanel();
+}
+
+/* ══════════════════════════════════════════════════════
+   PANEL OPEN / CLOSE
+══════════════════════════════════════════════════════ */
+function openSelPanel(){
+  document.getElementById('sel-panel').classList.add('open');
+  document.getElementById('overlay').classList.add('open');
+  renderSelItems();updateSelBadge();
+}
+function closeSelPanel(){
+  document.getElementById('sel-panel').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+}
+
+/* ══════════════════════════════════════════════════════
+   COPY / CLEAR
+══════════════════════════════════════════════════════ */
+function copyJson(){
+  if(!latestJson){showToast('Nothing to copy');return;}
+  const data=allRecords.length>1?{items:allRecords}:latestJson;
+  robustCopy(JSON.stringify(data,null,2)).then(ok=>{
+    showToast(ok!==false?'JSON copied to clipboard':'Copy failed — try the Context Buffer panel');
+  });
+}
+
+function clearAll(){
+  latestJson=null;allRecords=[];allPaths=[];rpPage=0;
+  document.getElementById('output').textContent='Cleared.';
+  document.getElementById('path-list').innerHTML='';
+  document.getElementById('path-count').textContent='0 paths';
+  document.getElementById('json-path-label').textContent='No data loaded';
+  document.getElementById('path-search').value='';
+  document.getElementById('totalbar').style.display='none';
+  document.getElementById('result-pager').classList.remove('visible');
+  ['s-status','s-items','s-keys','s-size','s-time'].forEach(id=>
+    setStat(id,id==='s-status'?'Idle':id==='s-size'?'0 KB':id==='s-time'?'— ms':'0','sv-idle'));
+  setStat('s-endpoint','—','sv-idle');
+  const old=document.getElementById('toolbar-save');if(old)old.remove();
+}
+
+/* ══════════════════════════════════════════════════════
+   TOAST
+══════════════════════════════════════════════════════ */
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+/* ══════════════════════════════════════════════════════
+   KEYBOARD
+══════════════════════════════════════════════════════ */
+['path','pagesize'].forEach(id=>
+  document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')loadData();})
+);
+
+/* ══════════════════════════════════════════════════════
+   HOW TO USE GUIDE
+══════════════════════════════════════════════════════ */
+function openGuide(){
+  document.getElementById('guide-overlay').classList.add('open');
+  document.getElementById('guide-modal').scrollTop=0;
+}
+function closeGuide(){
+  document.getElementById('guide-overlay').classList.remove('open');
+}
+function handleGuideOverlayClick(e){
+  if(e.target===document.getElementById('guide-overlay')) closeGuide();
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape') closeGuide();});
+</script>
+</body>
+</html>
