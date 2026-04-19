@@ -1,4 +1,4 @@
-# Manager.io — Developer Toolkit
+# Manager.io — Prompt Builder
 
 > **Build custom Manager.io extensions in minutes — no coding required.**  
 > Explore any API endpoint, inspect its data, and generate a complete AI prompt that produces a fully working extension.
