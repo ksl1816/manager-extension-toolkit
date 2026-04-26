@@ -1,0 +1,2378 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- ═══════════════ SECURITY HEADERS ═══════════════
+     • CSP locks down what can run/load in this page
+     • cdnjs is whitelisted because Chart.js is loaded from there
+     • Nothing else can make network calls from this page
+═══════════════════════════════════════════════════ -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data:; connect-src https://*.supabase.co; frame-ancestors *; form-action 'none'; base-uri 'self';">
+<meta name="referrer" content="no-referrer">
+<title>Sales Analysis — v2.0</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --blue:    #1d6fcf;
+  --blue-lt: #dbeafe;
+  --green:   #16a34a;
+  --green-lt:#dcfce7;
+  --red:     #dc2626;
+  --red-lt:  #fee2e2;
+  --amber:   #d97706;
+  --amber-lt:#fef3c7;
+  --purple:  #7c3aed;
+  --purple-lt:#ede9fe;
+  --teal:    #0d9488;
+  --teal-lt: #ccfbf1;
+  --bg:      #f8fafc;
+  --card:    #ffffff;
+  --border:  #e2e8f0;
+  --text:    #1e293b;
+  --muted:   #64748b;
+  --light:   #f1f5f9;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 16px;
+  font-size: 14px;
+}
+
+/* ── Control Bar ── */
+.ctrl-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 12px 16px; margin-bottom: 16px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.load-btn {
+  padding: 8px 20px; border: none; border-radius: 7px; cursor: pointer;
+  font-size: 13px; font-weight: 700;
+  background: var(--blue); color: #fff; white-space: nowrap; transition: opacity .15s;
+}
+.load-btn:disabled { opacity: .45; cursor: not-allowed; }
+.progress-wrap { flex: 1; min-width: 120px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.progress-bar  { height: 100%; width: 0%; background: var(--blue); border-radius: 3px; transition: width .25s; }
+.status-text   { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.error-box { color: var(--red); background: var(--red-lt); border: 1px solid #fca5a5;
+  border-radius: 8px; padding: 12px 16px; font-size: 13px; margin-bottom: 16px; }
+
+/* ── FX Conversion Notice ── */
+.fx-notice {
+  display: flex; align-items: center; gap: 10px;
+  background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a;
+  border-radius: 8px; padding: 10px 14px; margin-bottom: 16px;
+  font-size: 12.5px; line-height: 1.45;
+}
+.fx-notice .fx-icon { font-size: 15px; flex-shrink: 0; }
+.fx-notice strong { color: #1d4ed8; font-weight: 600; }
+.fx-notice code {
+  background: #dbeafe; color: #1e40af; padding: 1px 6px; border-radius: 4px;
+  font-size: 11.5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ── Filter Panel ── */
+.filter-panel {
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 16px; margin-bottom: 16px;
+  display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.filter-group { display: flex; flex-direction: column; gap: 4px; }
+.filter-group label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.filter-group select, .filter-group input {
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 13px; color: var(--text); background: #fff; outline: none;
+}
+.filter-group select:focus, .filter-group input:focus { border-color: var(--blue); }
+.months-grid {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.month-chip {
+  padding: 4px 10px; border: 1.5px solid var(--border); border-radius: 20px;
+  font-size: 12px; font-weight: 500; cursor: pointer; transition: all .15s;
+  background: #fff; color: var(--muted); user-select: none;
+}
+.month-chip.active {
+  border-color: var(--blue); background: var(--blue); color: #fff;
+}
+.apply-btn {
+  padding: 7px 18px; background: var(--blue); color: #fff;
+  border: none; border-radius: 6px; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: opacity .15s; align-self: flex-end;
+}
+.apply-btn:hover { opacity: .85; }
+.clear-btn {
+  padding: 7px 14px; background: var(--light); color: var(--muted);
+  border: none; border-radius: 6px; font-size: 13px; font-weight: 600;
+  cursor: pointer; align-self: flex-end;
+}
+
+/* ── Summary Cards ── */
+.summary-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px; margin-bottom: 18px;
+}
+.summary-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,.05);
+}
+.summary-card .sc-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+.summary-card .sc-value { font-size: 20px; font-weight: 700; color: var(--text); }
+.summary-card .sc-sub   { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.summary-card.blue  { border-top: 3px solid var(--blue); }
+.summary-card.green { border-top: 3px solid var(--green); }
+.summary-card.amber { border-top: 3px solid var(--amber); }
+.summary-card.red   { border-top: 3px solid var(--red); }
+.summary-card.purple{ border-top: 3px solid var(--purple); }
+.summary-card.teal  { border-top: 3px solid var(--teal); }
+
+/* ── Section Headers ── */
+.section-header {
+  font-size: 16px; font-weight: 700; color: var(--text);
+  padding: 10px 0 8px; border-bottom: 2px solid var(--border);
+  margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+}
+.section-header .badge {
+  font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600;
+}
+
+/* ── Month Block ── */
+.month-block {
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  margin-bottom: 20px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.month-header {
+  padding: 14px 18px; display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px;
+}
+.month-title { font-size: 17px; font-weight: 700; }
+.month-meta  { display: flex; gap: 16px; flex-wrap: wrap; }
+.meta-item   { font-size: 12px; }
+.meta-item span { font-weight: 700; }
+.month-body  { padding: 16px 18px; }
+
+/* Month color stripes */
+.mh-jan  { background: linear-gradient(135deg,#eff6ff,#dbeafe); border-bottom: 2px solid #93c5fd; }
+.mh-feb  { background: linear-gradient(135deg,#fdf4ff,#fae8ff); border-bottom: 2px solid #d8b4fe; }
+.mh-mar  { background: linear-gradient(135deg,#f0fdf4,#dcfce7); border-bottom: 2px solid #86efac; }
+.mh-apr  { background: linear-gradient(135deg,#fff7ed,#ffedd5); border-bottom: 2px solid #fdba74; }
+.mh-may  { background: linear-gradient(135deg,#fefce8,#fef08a); border-bottom: 2px solid #fde047; }
+.mh-jun  { background: linear-gradient(135deg,#f0fdfa,#ccfbf1); border-bottom: 2px solid #5eead4; }
+.mh-jul  { background: linear-gradient(135deg,#eff6ff,#bfdbfe); border-bottom: 2px solid #60a5fa; }
+.mh-aug  { background: linear-gradient(135deg,#fff1f2,#ffe4e6); border-bottom: 2px solid #fda4af; }
+.mh-sep  { background: linear-gradient(135deg,#f5f3ff,#ede9fe); border-bottom: 2px solid #c4b5fd; }
+.mh-oct  { background: linear-gradient(135deg,#fff7ed,#fed7aa); border-bottom: 2px solid #fb923c; }
+.mh-nov  { background: linear-gradient(135deg,#ecfdf5,#a7f3d0); border-bottom: 2px solid #34d399; }
+.mh-dec  { background: linear-gradient(135deg,#fef2f2,#fecaca); border-bottom: 2px solid #f87171; }
+
+/* ── Table ── */
+.data-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.data-table th {
+  background: var(--light); padding: 8px 10px;
+  text-align: left; font-weight: 600; font-size: 11px;
+  color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
+  border-bottom: 1px solid var(--border); position: sticky; top: 0;
+}
+.data-table td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: #f8fafc; }
+.data-table tr.total-row td { font-weight: 700; background: var(--light); border-top: 2px solid var(--border); }
+.data-table tr.best-row td { background: #f0fdf4; }
+.data-table tr.worst-row td { background: #fff1f2; }
+
+/* Percentage bar */
+.pct-bar-wrap { display: flex; align-items: center; gap: 6px; }
+.pct-bar { height: 6px; border-radius: 3px; background: var(--blue); min-width: 2px; }
+.pct-txt { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+/* ── Chart wrapper ── */
+.chart-wrap { position: relative; margin-top: 16px; }
+.chart-title {
+  font-size: 12px; font-weight: 600; color: var(--muted);
+  margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;
+}
+.chart-total-badge {
+  font-size: 12px; font-weight: 700; padding: 3px 10px;
+  background: var(--blue); color: #fff; border-radius: 20px;
+}
+.canvas-container { position: relative; height: 220px; }
+
+/* ── Table/Chart toggle ── */
+.tab-bar {
+  display: flex; gap: 6px; margin-bottom: 12px;
+}
+.tab-btn {
+  padding: 5px 14px; border: 1.5px solid var(--border); border-radius: 6px;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  background: #fff; color: var(--muted); transition: all .15s;
+}
+.tab-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+/* ── Comparison Section ── */
+.comparison-block {
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 18px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.comp-chart-container { position: relative; height: 300px; margin-bottom: 18px; }
+
+/* Day comparison table */
+.day-compare-wrap { overflow-x: auto; }
+.day-compare-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 500px; }
+.day-compare-table th, .day-compare-table td {
+  padding: 6px 10px; border: 1px solid var(--border); text-align: right;
+}
+.day-compare-table th { background: var(--light); font-weight: 600; font-size: 11px; color: var(--muted); }
+.day-compare-table td:first-child { text-align: center; font-weight: 600; }
+.up   { color: var(--green); font-weight: 600; }
+.down { color: var(--red);   font-weight: 600; }
+.neutral { color: var(--muted); }
+
+/* ── Insights ── */
+.insights-block {
+  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+  border: 1px solid #7dd3fc; border-radius: 12px;
+  padding: 18px; margin-bottom: 20px;
+}
+.insights-block h3 { font-size: 14px; font-weight: 700; color: #0369a1; margin-bottom: 12px; }
+.insight-item {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 9px 12px; margin-bottom: 8px;
+  background: #fff; border-radius: 8px; border: 1px solid #bae6fd;
+}
+.insight-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+.insight-text { font-size: 13px; line-height: 1.5; color: var(--text); }
+.insight-text strong { color: #0369a1; }
+
+/* ── Performance Table ── */
+.perf-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px; margin-bottom: 16px;
+}
+.perf-card {
+  border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+  background: #fff;
+}
+.perf-card h4 { font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+.perf-row { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; border-bottom: 1px solid #f1f5f9; }
+.perf-row:last-child { border-bottom: none; }
+.perf-row .label { color: var(--muted); }
+.perf-row .value { font-weight: 600; }
+
+/* ── Empty / Loading states ── */
+.empty-state { text-align: center; padding: 40px; color: var(--muted); }
+
+/* Scrollable table */
+.table-scroll { overflow-x: auto; max-height: 360px; overflow-y: auto; }
+
+/* Legend dots */
+.legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; }
+
+/* ═══════════════════════════════════════════════
+   APP HEADER — branding + connection + utility buttons
+═══════════════════════════════════════════════ */
+.app-header {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 16px; margin-bottom: 12px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.brand-wrap { display: flex; align-items: center; gap: 10px; }
+.brand-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--blue), var(--purple));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0;
+}
+.brand-name {
+  font-size: 14px; font-weight: 700; color: var(--text); letter-spacing: -.01em;
+  line-height: 1.2; white-space: nowrap;
+}
+.brand-sub { font-size: 11px; color: var(--muted); font-weight: 500; }
+
+.hdr-divider { width: 1px; height: 24px; background: var(--border); flex-shrink: 0; }
+
+.hdr-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.hdr-badge {
+  padding: 3px 9px; border-radius: 4px;
+  font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.badge-version { background: var(--blue-lt); color: var(--blue); border: 1px solid #93c5fd; }
+.badge-readonly { background: var(--green-lt); color: var(--green); border: 1px solid #86efac; }
+.badge-security {
+  background: var(--purple-lt); color: var(--purple); border: 1px solid #c4b5fd;
+  cursor: pointer; transition: all .15s;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.badge-security:hover { background: #ddd6fe; transform: translateY(-1px); }
+
+/* Connection pill */
+.conn-pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 4px 11px; border-radius: 20px;
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+  transition: all .2s; border: 1px solid;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .02em;
+}
+.conn-pill .conn-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; position: relative; }
+.conn-pill.checking { background: var(--amber-lt); color: #b45309; border-color: #fcd34d; }
+.conn-pill.checking .conn-dot { background: var(--amber); animation: conn-blink 1.2s ease-in-out infinite; }
+.conn-pill.connected { background: var(--green-lt); color: #15803d; border-color: #86efac; }
+.conn-pill.connected .conn-dot { background: var(--green); }
+.conn-pill.connected .conn-dot::after {
+  content: ''; position: absolute; inset: -4px; border-radius: 50%;
+  background: var(--green); opacity: .4;
+  animation: conn-ring 2s ease-in-out infinite;
+}
+.conn-pill.disconnected { background: var(--red-lt); color: #b91c1c; border-color: #fca5a5; }
+.conn-pill.disconnected .conn-dot { background: var(--red); }
+@keyframes conn-blink { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(.85); } }
+@keyframes conn-ring { 0%,100% { transform: scale(1); opacity: .4; } 50% { transform: scale(1.7); opacity: 0; } }
+
+.hdr-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+.btn-hire {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 7px;
+  background: linear-gradient(135deg, #fef3c7, #ede9fe);
+  border: 1px solid #fcd34d;
+  color: #b45309; font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: all .18s; white-space: nowrap;
+  position: relative; overflow: hidden;
+}
+.btn-hire::before {
+  content: ''; position: absolute; top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(245,158,11,.25), transparent);
+  transition: left .6s ease;
+}
+.btn-hire:hover::before { left: 100%; }
+.btn-hire:hover {
+  background: linear-gradient(135deg, #fde68a, #ddd6fe);
+  border-color: var(--amber);
+  box-shadow: 0 2px 8px rgba(217,119,6,.2);
+  transform: translateY(-1px);
+}
+
+/* ═══════════════════════════════════════════════
+   MODALS — Hire-Us + Security (shared base)
+═══════════════════════════════════════════════ */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(15,23,42,.55);
+  z-index: 500; opacity: 0; pointer-events: none;
+  transition: opacity .22s; backdrop-filter: blur(3px);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 32px 16px; overflow-y: auto;
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+
+.modal-card {
+  background: #fff; border: 1px solid var(--border); border-radius: 14px;
+  width: 100%; max-width: 560px; margin: auto;
+  box-shadow: 0 24px 60px rgba(0,0,0,.25);
+  overflow: hidden;
+}
+
+.modal-head {
+  position: relative;
+  padding: 24px 26px 18px;
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+.modal-head::after {
+  content: ''; position: absolute; top: -60px; right: -40px;
+  width: 200px; height: 200px; border-radius: 50%;
+  pointer-events: none;
+}
+.modal-head.hire { background: linear-gradient(135deg, #fffbeb, #f5f3ff); }
+.modal-head.hire::after { background: radial-gradient(circle, rgba(245,158,11,.18), transparent 60%); }
+.modal-head.sec  { background: linear-gradient(135deg, #f5f3ff, #eff6ff); }
+.modal-head.sec::after { background: radial-gradient(circle, rgba(124,58,237,.18), transparent 60%); }
+
+.modal-eyebrow {
+  display: inline-block; font-size: 10px; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase;
+  border-radius: 20px; padding: 3px 11px; margin-bottom: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  position: relative; z-index: 1;
+}
+.modal-eyebrow.hire { color: #b45309; background: #fef3c7; border: 1px solid #fcd34d; }
+.modal-eyebrow.sec  { color: var(--purple); background: var(--purple-lt); border: 1px solid #c4b5fd; }
+
+.modal-title {
+  font-size: 20px; font-weight: 800; color: var(--text);
+  letter-spacing: -.02em; line-height: 1.3; margin-bottom: 6px;
+  position: relative; z-index: 1;
+}
+.modal-title .accent {
+  background: linear-gradient(135deg, #d97706, var(--purple));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.modal-subtitle {
+  font-size: 13px; color: var(--muted); line-height: 1.6;
+  position: relative; z-index: 1;
+}
+.modal-close {
+  position: absolute; top: 14px; right: 14px;
+  background: rgba(255,255,255,.8); border: 1px solid var(--border);
+  color: var(--muted); font-size: 14px; cursor: pointer;
+  padding: 4px 10px; border-radius: 6px; line-height: 1;
+  transition: all .12s; z-index: 2;
+}
+.modal-close:hover { background: var(--red-lt); border-color: #fca5a5; color: var(--red); }
+
+.modal-body { padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; }
+
+.modal-footer {
+  padding: 12px 22px; border-top: 1px solid var(--border);
+  background: #fafafa;
+  font-size: 11px; color: var(--muted);
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+}
+
+/* Hire modal internals */
+.hire-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.hire-col {
+  padding: 14px; border-radius: 8px;
+  border: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 5px;
+}
+.hire-col.free { border-color: #86efac; background: var(--green-lt); }
+.hire-col.pro  { border-color: #fcd34d; background: var(--amber-lt); }
+.hire-col-label { font-size: 9px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-family: ui-monospace, monospace; }
+.hire-col.free .hire-col-label { color: #15803d; }
+.hire-col.pro  .hire-col-label { color: #b45309; }
+.hire-col-title { font-size: 13px; font-weight: 700; color: var(--text); }
+.hire-col-desc  { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+
+.hire-services {
+  background: #fafafa; border: 1px solid var(--border);
+  border-radius: 8px; padding: 14px 16px;
+}
+.hire-services h4 {
+  font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 10px; font-family: ui-monospace, monospace;
+}
+.hire-services ul { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.hire-services li {
+  display: flex; gap: 9px; font-size: 12.5px; color: var(--text); line-height: 1.5;
+}
+.hire-services li::before {
+  content: '✓'; color: var(--green); font-weight: 800; flex-shrink: 0;
+  font-family: ui-monospace, monospace;
+}
+
+.hire-contact {
+  background: linear-gradient(135deg, #eff6ff, #f5f3ff);
+  border: 1px solid #c7d2fe; border-radius: 8px; padding: 14px 16px;
+}
+.hire-contact-label {
+  font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--blue); margin-bottom: 6px; font-family: ui-monospace, monospace;
+}
+.hire-contact p { font-size: 12.5px; color: var(--text); line-height: 1.6; margin-bottom: 10px; }
+.hire-cta {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 16px; border-radius: 7px;
+  background: linear-gradient(135deg, var(--blue), var(--purple));
+  color: #fff; font-size: 12.5px; font-weight: 700;
+  text-decoration: none; transition: all .15s;
+}
+.hire-cta:hover { box-shadow: 0 4px 14px rgba(29,111,207,.35); transform: translateY(-1px); }
+
+/* Security modal internals */
+.sec-check {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 12px 14px; border-radius: 8px;
+  background: #fafafa; border: 1px solid var(--border);
+  transition: border-color .14s;
+}
+.sec-check:hover { border-color: #cbd5e1; }
+.sec-check-icon {
+  width: 30px; height: 30px; border-radius: 7px; flex-shrink: 0;
+  background: var(--green-lt); border: 1px solid #86efac;
+  color: #15803d; font-weight: 800; font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: ui-monospace, monospace;
+}
+.sec-check-body { flex: 1; min-width: 0; }
+.sec-check-title {
+  font-size: 13px; font-weight: 700; color: var(--text);
+  margin-bottom: 3px; display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+}
+.sec-check-status {
+  font-size: 9px; font-weight: 800; letter-spacing: .06em;
+  color: #15803d; background: var(--green-lt); border: 1px solid #86efac;
+  border-radius: 3px; padding: 1px 6px;
+  font-family: ui-monospace, monospace;
+}
+.sec-check-desc { font-size: 12px; color: var(--muted); line-height: 1.55; }
+.sec-origin-block {
+  margin-top: 6px; padding: 7px 10px; border-radius: 5px;
+  background: #fff; border: 1px dashed var(--border);
+  font-family: ui-monospace, monospace; font-size: 11px;
+  color: var(--blue); word-break: break-all;
+}
+.sec-origin-block.pending { color: #b45309; border-color: #fcd34d; background: #fffbeb; }
+.sec-origin-label { color: var(--muted); margin-right: 6px; }
+
+/* Responsive tweaks */
+@media (max-width: 640px) {
+  .btn-hire span:not(.btn-hire-icon) { display: none; }
+  .conn-pill span:not(.conn-dot) { display: none; }
+  .conn-pill { padding: 4px 6px; }
+  .brand-sub { display: none; }
+  .hdr-meta .badge-readonly { display: none; }
+  .hire-compare { grid-template-columns: 1fr; }
+}
+
+/* ══════════════════════════════════════════════
+   V2 NEW STYLES
+══════════════════════════════════════════════ */
+
+/* ── Revenue Evolution Chart ── */
+.rev-evolution-block {
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 20px 22px; margin-bottom: 22px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.07);
+}
+.rev-evolution-title {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+  margin-bottom: 14px;
+}
+.rev-evolution-title h2 {
+  font-size: 16px; font-weight: 800; color: var(--text); display: flex; align-items: center; gap: 8px;
+}
+.rev-toggle-bar {
+  display: flex; gap: 4px; background: var(--light);
+  padding: 4px; border-radius: 8px; border: 1px solid var(--border);
+}
+.rev-toggle-btn {
+  padding: 5px 14px; border: none; border-radius: 5px;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+  background: transparent; color: var(--muted); transition: all .15s;
+}
+.rev-toggle-btn.active {
+  background: var(--blue); color: #fff;
+  box-shadow: 0 1px 3px rgba(29,111,207,.35);
+}
+.rev-canvas-container { position: relative; height: 280px; }
+.rev-stats-row {
+  display: flex; gap: 16px; flex-wrap: wrap; margin-top: 14px;
+  padding-top: 14px; border-top: 1px solid var(--border);
+}
+.rev-stat {
+  flex: 1; min-width: 100px; text-align: center;
+  background: var(--light); border-radius: 8px; padding: 10px;
+}
+.rev-stat .rs-label { font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+.rev-stat .rs-val   { font-size: 15px; font-weight: 800; color: var(--text); margin-top: 2px; }
+.rev-stat .rs-sub   { font-size: 10px; color: var(--muted); margin-top: 1px; }
+
+/* ── Monthly Breakdown section controls ── */
+.monthly-section-controls {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.monthly-section-toggle {
+  padding: 5px 13px; border: 1.5px solid var(--border); border-radius: 6px;
+  font-size: 12px; font-weight: 700; cursor: pointer; background: #fff;
+  color: var(--muted); transition: all .15s; display: inline-flex; align-items: center; gap: 5px;
+}
+.monthly-section-toggle:hover { border-color: var(--blue); color: var(--blue); }
+.monthly-section-toggle.danger { color: var(--red); border-color: #fca5a5; }
+.monthly-section-toggle.danger:hover { background: var(--red-lt); }
+
+/* ── Collapsible Month Block v2 ── */
+.month-block-v2 {
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  margin-bottom: 14px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  transition: box-shadow .2s;
+}
+.month-block-v2:hover { box-shadow: 0 3px 10px rgba(0,0,0,.1); }
+.month-header-v2 {
+  padding: 12px 18px; display: flex; align-items: center;
+  justify-content: space-between; flex-wrap: wrap; gap: 10px;
+  cursor: pointer; user-select: none;
+}
+.month-header-v2:hover { filter: brightness(.97); }
+.month-title-wrap { display: flex; align-items: center; gap: 10px; }
+.month-collapse-icon {
+  font-size: 13px; transition: transform .22s; flex-shrink: 0;
+}
+.month-collapse-icon.collapsed { transform: rotate(-90deg); }
+.month-header-actions {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+}
+.btn-hide-month {
+  padding: 3px 10px; font-size: 11px; font-weight: 600;
+  border: 1.5px solid #fca5a5; border-radius: 5px;
+  background: var(--red-lt); color: var(--red); cursor: pointer;
+  transition: all .15s; white-space: nowrap;
+}
+.btn-hide-month:hover { background: #fecaca; }
+.month-body-collapsible {
+  max-height: 2000px; overflow: hidden;
+  transition: max-height .3s ease, padding .3s ease;
+}
+.month-body-collapsible.collapsed { max-height: 0; }
+
+/* ── Coming Soon Block ── */
+.coming-soon-section {
+  margin-bottom: 20px;
+}
+.coming-soon-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+.coming-soon-card {
+  background: var(--card); border: 1.5px dashed var(--border); border-radius: 12px;
+  padding: 20px; display: flex; flex-direction: column; gap: 10px;
+  position: relative; overflow: hidden; transition: border-color .2s, box-shadow .2s;
+}
+.coming-soon-card:hover { border-color: #cbd5e1; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.coming-soon-card::before {
+  content: 'COMING SOON';
+  position: absolute; top: 10px; right: -18px;
+  background: var(--amber); color: #fff;
+  font-size: 9px; font-weight: 800; letter-spacing: .1em;
+  padding: 3px 26px; transform: rotate(35deg);
+  font-family: ui-monospace, monospace;
+}
+.cs-icon { font-size: 28px; }
+.cs-title { font-size: 14px; font-weight: 800; color: var(--text); }
+.cs-desc  { font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+.cs-features { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.cs-features li {
+  font-size: 12px; color: var(--muted); display: flex; gap: 7px; align-items: flex-start;
+}
+.cs-features li::before { content: '→'; color: var(--blue); font-weight: 700; flex-shrink: 0; }
+.cs-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10px; font-weight: 700; padding: 3px 9px;
+  border-radius: 20px; align-self: flex-start;
+  font-family: ui-monospace, monospace; letter-spacing: .04em;
+}
+.cs-badge.planned { background: var(--blue-lt); color: var(--blue); border: 1px solid #93c5fd; }
+.cs-badge.data-ready { background: var(--green-lt); color: var(--green); border: 1px solid #86efac; }
+
+/* ══ AUTH GATE ══ */
+#auth-gate {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(248,250,252,.97);
+  backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  transition: opacity .3s;
+}
+#auth-gate.hidden { opacity: 0; pointer-events: none; }
+.ag-card {
+  background: #fff; border: 1px solid #e2e8f0;
+  border-radius: 16px; box-shadow: 0 8px 40px rgba(0,0,0,.12);
+  width: 100%; max-width: 380px; overflow: hidden;
+}
+.ag-brand {
+  padding: 24px 24px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  text-align: center;
+}
+.ag-logo {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: linear-gradient(135deg,#1d6fcf,#7c3aed);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 22px; margin-bottom: 12px;
+}
+.ag-title { font-size: 17px; font-weight: 700; color: #1e293b; margin-bottom: 3px; }
+.ag-sub   { font-size: 12.5px; color: #64748b; line-height: 1.5; }
+.ag-tabs  {
+  display: grid; grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 6px 0; gap: 4px;
+}
+.ag-tab {
+  padding: 10px; background: none; border: none;
+  font-size: 13px; font-weight: 600; color: #94a3b8;
+  cursor: pointer; border-radius: 8px 8px 0 0;
+  position: relative; transition: color .15s;
+}
+.ag-tab.on { color: #1e293b; background: #f8fafc; }
+.ag-tab.on::after { content:""; position:absolute; bottom:-1px; left:0; right:0; height:2px; background:linear-gradient(90deg,#1d6fcf,#7c3aed); border-radius:2px 2px 0 0; }
+.ag-body { padding: 20px; }
+.ag-panel { display: none; }
+.ag-panel.on { display: block; }
+.ag-err { font-size:12px; color:#dc2626; background:#fee2e2; border:1px solid #fca5a5; border-radius:7px; padding:8px 12px; margin-bottom:12px; display:none; }
+.ag-err.show { display:block; }
+.ag-row2 { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+.ag-field { margin-bottom:12px; }
+.ag-field label { display:block; font-size:11.5px; font-weight:600; color:#64748b; margin-bottom:5px; text-transform:uppercase; letter-spacing:.04em; }
+.ag-field input {
+  width:100%; padding:10px 12px; border-radius:8px;
+  border:1px solid #e2e8f0; font-size:13.5px; color:#1e293b;
+  background:#f8fafc; outline:none; transition:.15s;
+  font-family:inherit;
+}
+.ag-field input:focus { border-color:#1d6fcf; background:#fff; box-shadow:0 0 0 3px rgba(29,111,207,.1); }
+.ag-field input::placeholder { color:#94a3b8; }
+.ag-remember { display:flex; align-items:center; gap:8px; margin:-4px 0 14px; cursor:pointer; }
+.ag-remember input { width:15px; height:15px; accent-color:#1d6fcf; cursor:pointer; }
+.ag-remember span { font-size:12.5px; color:#64748b; }
+.ag-btn {
+  width:100%; padding:12px; border:none; border-radius:9px;
+  background:linear-gradient(135deg,#1d6fcf,#7c3aed);
+  color:#fff; font-size:14px; font-weight:700;
+  cursor:pointer; transition:.15s; font-family:inherit;
+  box-shadow:0 3px 14px rgba(29,111,207,.3);
+}
+.ag-btn:hover { opacity:.88; transform:translateY(-1px); }
+.ag-btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+.ag-foot { text-align:center; margin-top:14px; font-size:12.5px; color:#94a3b8; }
+.ag-foot a { color:#1d6fcf; text-decoration:none; font-weight:600; }
+.ag-foot a:hover { color:#7c3aed; }
+.ag-forgot { text-align:right; margin:-6px 0 12px; }
+.ag-forgot a { font-size:12px; color:#94a3b8; text-decoration:none; }
+.ag-forgot a:hover { color:#1d6fcf; }
+.ag-ksl { text-align:center; padding:12px; border-top:1px solid #f1f5f9; font-size:11.5px; color:#94a3b8; }
+.ag-ksl a { color:#64748b; text-decoration:none; font-weight:500; }
+.ag-ksl a:hover { color:#1d6fcf; }
+.hdr-user-pill {
+  display:flex; align-items:center; gap:8px;
+  padding:5px 12px; border-radius:20px;
+  background:#f1f5f9; border:1px solid #e2e8f0;
+  font-size:12px; color:#475569;
+}
+.hdr-user-email { font-weight:600; color:#1e293b; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hdr-signout {
+  padding:3px 10px; border-radius:5px; border:1px solid #e2e8f0;
+  background:#fff; color:#64748b; font-size:11.5px; font-weight:600;
+  cursor:pointer; font-family:inherit; transition:.15s;
+}
+.hdr-signout:hover { border-color:#fca5a5; color:#dc2626; background:#fee2e2; }
+</style>
+</head>
+<body>
+
+<!-- ══ AUTH GATE OVERLAY ══ -->
+<div id="auth-gate">
+  <div class="ag-card">
+    <div class="ag-brand">
+      <div class="ag-logo">📊</div>
+      <div class="ag-title">Sales Analysis</div>
+      <div class="ag-sub">Manager.io Extension by KSL Solutions<br>Sign in to access this free tool.</div>
+    </div>
+    <div class="ag-tabs">
+      <button class="ag-tab on" onclick="agTab('in')">Sign In</button>
+      <button class="ag-tab"    onclick="agTab('up')">Sign Up</button>
+    </div>
+    <div class="ag-body">
+      <div class="ag-panel on" id="ag-panel-in">
+        <div class="ag-err" id="ag-err-in"></div>
+        <div class="ag-field"><label>Email</label>
+          <input type="email" id="ag-in-email" placeholder="you@example.com" autocomplete="email">
+        </div>
+        <div class="ag-field"><label>Password</label>
+          <input type="password" id="ag-in-pass" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <div class="ag-forgot"><a href="#" onclick="agForgot();return false">Forgot password?</a></div>
+        <label class="ag-remember">
+          <input type="checkbox" id="ag-remember" checked>
+          <span>Keep me signed in</span>
+        </label>
+        <button class="ag-btn" id="ag-btn-in" onclick="agSignIn()">Sign In →</button>
+        <div class="ag-foot">No account? <a href="#" onclick="agTab('up');return false">Create one free</a></div>
+      </div>
+      <div class="ag-panel" id="ag-panel-up">
+        <div class="ag-err" id="ag-err-up"></div>
+        <div class="ag-row2">
+          <div class="ag-field"><label>First name</label><input type="text" id="ag-up-first" placeholder="Ada"></div>
+          <div class="ag-field"><label>Last name</label><input type="text" id="ag-up-last" placeholder="Lovelace"></div>
+        </div>
+        <div class="ag-field"><label>Email</label>
+          <input type="email" id="ag-up-email" placeholder="you@example.com" autocomplete="email">
+        </div>
+        <div class="ag-field"><label>Password</label>
+          <input type="password" id="ag-up-pass" placeholder="Min 8 characters" autocomplete="new-password">
+        </div>
+        <button class="ag-btn" id="ag-btn-up" onclick="agSignUp()">Create Free Account →</button>
+        <div class="ag-foot">Have an account? <a href="#" onclick="agTab('in');return false">Sign in</a></div>
+      </div>
+    </div>
+    <div class="ag-ksl">By <a href="https://ksl1816.github.io/ksl-solution-site/" target="_blank" rel="noopener">KSL Solutions</a> · Free to use</div>
+  </div>
+</div>
+
+<!-- ══ App Header — branding + status + utility ══ -->
+<div class="app-header">
+  <div class="brand-wrap">
+    <div class="brand-icon">📊</div>
+    <div>
+      <div class="brand-name">Sales Analysis</div>
+      <div class="brand-sub">for Manager.io</div>
+    </div>
+  </div>
+  <div class="hdr-divider"></div>
+  <div class="hdr-meta">
+    <span class="hdr-badge badge-version">v2.0</span>
+    <span class="hdr-badge badge-readonly">GET · Read-Only</span>
+    <span class="hdr-badge badge-security" onclick="openSecurityModal()" title="View active security checks">
+      🔒 Secure
+    </span>
+  </div>
+  <div class="conn-pill checking" id="conn-pill" title="Checking connection to Manager.io…">
+    <span class="conn-dot"></span>
+    <span id="conn-text">Checking…</span>
+  </div>
+  <div class="hdr-right" style="display:flex;align-items:center;gap:10px;">
+    <div class="hdr-user-pill" id="hdr-user-pill" style="display:none">
+      <span>👤</span>
+      <span class="hdr-user-email" id="hdr-user-email"></span>
+      <button class="hdr-signout" onclick="agSignOut()">Sign out</button>
+    </div>
+    <button class="btn-hire" onclick="openHireModal()" title="Need a custom extension built? Contact us.">
+      <span class="btn-hire-icon">💼</span>
+      <span>Need Custom Dev?</span>
+    </button>
+  </div>
+</div>
+
+<!-- ══ Control Bar ══ -->
+<div class="ctrl-bar">
+  <button class="load-btn" id="load-btn" onclick="loadAllRecords()">⬇ Load All Records</button>
+  <div class="progress-wrap"><div class="progress-bar" id="prog-bar"></div></div>
+  <span class="status-text" id="status-text">Press Load to fetch data from Manager</span>
+</div>
+
+<!-- ══ FX Conversion Notice ══ -->
+<div class="fx-notice">
+  <span class="fx-icon">💱</span>
+  <span>All figures are shown in <strong>base currency</strong>. Foreign-currency invoices are automatically converted using each invoice's own <code>exchangeRate</code> to depict correct, comparable figures.</span>
+</div>
+
+<!-- ══ Main App Container ══ -->
+<div id="app"></div>
+
+<!-- ══ Hire-Us Modal ══ -->
+<div class="modal-overlay" id="hire-overlay" onclick="handleOverlayClick(event, 'hire')">
+  <div class="modal-card">
+    <div class="modal-head hire">
+      <button class="modal-close" onclick="closeHireModal()">✕</button>
+      <span class="modal-eyebrow hire">⚡ Professional Services</span>
+      <div class="modal-title">Need a <span class="accent">Custom Extension</span> Built?</div>
+      <div class="modal-subtitle">
+        This report is <strong style="color:#15803d">100% free</strong> to use. If you'd rather have an expert build a polished, production-ready Manager.io extension tailored to your business — we're here to help.
+      </div>
+    </div>
+    <div class="modal-body">
+
+      <div class="hire-compare">
+        <div class="hire-col free">
+          <div class="hire-col-label">✓ Free Forever</div>
+          <div class="hire-col-title">Use this report as-is</div>
+          <div class="hire-col-desc">All features free. Works with any Manager.io business.</div>
+        </div>
+        <div class="hire-col pro">
+          <div class="hire-col-label">★ Done For You</div>
+          <div class="hire-col-title">Custom development</div>
+          <div class="hire-col-desc">We design, build, test &amp; deploy a bespoke extension for your workflow.</div>
+        </div>
+      </div>
+
+      <div class="hire-services">
+        <h4>What we can build for you</h4>
+        <ul>
+          <li>Custom dashboards, KPI views, and reports tailored to your metrics</li>
+          <li>Branded invoice, quote, and document layouts</li>
+          <li>Multi-endpoint tools — cross-report analysis, reconciliation, audits</li>
+          <li>Industry-specific workflows: retail, construction, services, manufacturing</li>
+          <li>Ongoing support, maintenance, and feature updates</li>
+        </ul>
+      </div>
+
+      <div class="hire-contact">
+        <div class="hire-contact-label">🌐 Learn more &amp; get in touch</div>
+        <p>Visit our website to see our work, explore our services, and reach out through our contact form. We typically reply within one business day — no commitment.</p>
+        <a href="https://ksl1816.github.io/ksl-solution-site/" target="_blank" rel="noopener" class="hire-cta">
+          🌐 Visit Our Website →
+        </a>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <span>Free tool · Paid custom development</span>
+      <span style="font-family:ui-monospace,monospace">v2.0</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Security Modal ══ -->
+<div class="modal-overlay" id="sec-overlay" onclick="handleOverlayClick(event, 'sec')">
+  <div class="modal-card">
+    <div class="modal-head sec">
+      <button class="modal-close" onclick="closeSecurityModal()">✕</button>
+      <span class="modal-eyebrow sec">🔒 Security Layer</span>
+      <div class="modal-title">Active Protections</div>
+      <div class="modal-subtitle">
+        This report runs with multiple defense layers to keep your Manager.io data safe. Every check is enforced at runtime.
+      </div>
+    </div>
+    <div class="modal-body">
+
+     <div class="sec-check">
+        <div class="sec-check-icon">✓</div>
+        <div class="sec-check-body">
+          <div class="sec-check-title">Zero external tracking <span class="sec-check-status">NO ANALYTICS</span></div>
+          <div class="sec-check-desc">
+            No telemetry, no analytics, no cookies, no fingerprinting. Your sales data never leaves the Manager.io iframe boundary.
+          </div>
+        </div>
+      </div>
+         
+      <div class="sec-check">
+        <div class="sec-check-icon">✓</div>
+        <div class="sec-check-body">
+          <div class="sec-check-title">Origin-pinned postMessage <span class="sec-check-status">ACTIVE</span></div>
+          <div class="sec-check-desc">
+            After the first successful response, the host origin is locked. Any message from a different origin is silently rejected — a malicious iframe can't spoof API responses.
+          </div>
+          <div class="sec-origin-block pending" id="sec-origin-block">
+            <span class="sec-origin-label">Locked origin:</span>
+            <span id="sec-origin-value">(not yet established — click Load to connect)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec-check">
+        <div class="sec-check-icon">✓</div>
+        <div class="sec-check-body">
+          <div class="sec-check-title">Read-only API access <span class="sec-check-status">GET ONLY</span></div>
+          <div class="sec-check-desc">
+            Only HTTP GET requests are ever made — specifically to the <code style="font-family:ui-monospace,monospace;color:var(--blue)">sales-invoice-batch</code> endpoint. No writes, no mutations, nothing you do here can change data.
+          </div>
+        </div>
+      </div>
+
+      <div class="sec-check">
+        <div class="sec-check-icon">✓</div>
+        <div class="sec-check-body">
+          <div class="sec-check-title">Endpoint whitelist <span class="sec-check-status">ENFORCED</span></div>
+          <div class="sec-check-desc">
+            Every outgoing path is validated against a strict allow-list. Only the expected sales-invoice endpoint can be requested — no rogue calls possible, even if the API response tries to inject a malicious next-page URL.
+          </div>
+        </div>
+      </div>
+
+      <div class="sec-check">
+        <div class="sec-check-icon">✓</div>
+        <div class="sec-check-body">
+          <div class="sec-check-title">Content Security Policy <span class="sec-check-status">LOCKED</span></div>
+          <div class="sec-check-desc">
+            A strict CSP header blocks all external network calls and remote scripts, except the Chart.js library (loaded from cdnjs). The page talks to Manager.io only through its sandboxed postMessage bridge.
+          </div>
+        </div>
+      </div>
+
+      <div class="sec-check">
+        <div class="sec-check-icon">✓</div>
+        <div class="sec-check-body">
+          <div class="sec-check-title">XSS-safe rendering <span class="sec-check-status">ESCAPED</span></div>
+          <div class="sec-check-desc">
+            Error messages and any dynamic text from API responses are HTML-escaped before rendering, so hostile data inside a record can't execute scripts in the page.
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <span>All checks run client-side, in your browser</span>
+      <span style="font-family:ui-monospace,monospace">v2.0</span>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════
+   SECURITY LAYER — origin pinning + endpoint whitelist
+   These primitives gate every API call and every
+   piece of data that reaches the DOM.
+══════════════════════════════════════════════ */
+
+// Locked origin of the Manager.io host. Pinned on first successful response.
+let MANAGER_ORIGIN = null;
+
+function updateOriginDisplay() {
+  const block = document.getElementById('sec-origin-block');
+  const val   = document.getElementById('sec-origin-value');
+  if (!block || !val) return;
+  if (MANAGER_ORIGIN) {
+    block.classList.remove('pending');
+    val.textContent = MANAGER_ORIGIN;
+  }
+}
+
+// HTML-escape any value before putting it in innerHTML or attributes.
+function escHTML(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => (
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+  ));
+}
+
+// Whitelist: only paths starting with our known endpoint are permitted.
+// Blocks any attempt to redirect the fetch loop to a different endpoint,
+// even if a malicious `next_page_token` value tried to smuggle one in.
+function assertSafePath(path) {
+  if (typeof path !== 'string') throw new Error('Invalid path type');
+  if (path.length > 2048) throw new Error('Path too long');
+  if (/^(javascript|data|vbscript|file|blob):/i.test(path)) {
+    throw new Error('Blocked URL scheme in path');
+  }
+  if (!path.startsWith('/api4/sales-invoice-batch')) {
+    throw new Error('Path not in whitelist: only /api4/sales-invoice-batch is allowed');
+  }
+  if (!/^[A-Za-z0-9._\-\/?=&%+:,]+$/.test(path)) {
+    throw new Error('Path contains disallowed characters');
+  }
+}
+
+/* ══════════════════════════════════════════════
+   postMessage helper — DO NOT MODIFY THE CONTRACT
+   Hardened with: origin pinning, source verification,
+   and endpoint whitelist on every outgoing call.
+══════════════════════════════════════════════ */
+function postMessageWithResponse(message) {
+  return new Promise((resolve, reject) => {
+    // SECURITY: validate path before anything hits the wire
+    try { assertSafePath(message && message.path); }
+    catch (e) { reject(e); return; }
+
+    const requestId = crypto.randomUUID();
+    const timer = setTimeout(() => {
+      window.removeEventListener('message', handler);
+      reject(new Error('Timeout — is this running inside Manager?'));
+    }, 15000);
+    function handler(event) {
+      // SECURITY: origin pinning — reject any message not from the locked host
+      if (MANAGER_ORIGIN && event.origin !== MANAGER_ORIGIN) return;
+      // SECURITY: source must be the parent window (the Manager.io host)
+      if (event.source !== window.parent) return;
+      if (event.data?.type?.endsWith('-response') && event.data?.requestId === requestId) {
+        clearTimeout(timer);
+        window.removeEventListener('message', handler);
+        // Pin origin on first successful response
+        if (!MANAGER_ORIGIN && event.origin) {
+          MANAGER_ORIGIN = event.origin;
+          updateOriginDisplay();
+          setConnectionState('connected', 'Connected to Manager.io',
+            'Live API access confirmed.');
+        }
+        resolve(event.data.body);
+      }
+    }
+    window.addEventListener('message', handler);
+    window.parent.postMessage({ ...message, requestId }, '*');
+  });
+}
+
+/* ══════════════════════════════════════════════
+   CONNECTION STATUS
+══════════════════════════════════════════════ */
+function setConnectionState(state, text, tooltip) {
+  const pill = document.getElementById('conn-pill');
+  const txt  = document.getElementById('conn-text');
+  if (!pill || !txt) return;
+  pill.classList.remove('checking', 'connected', 'disconnected');
+  pill.classList.add(state);
+  txt.textContent = text;
+  if (tooltip) pill.title = tooltip;
+}
+
+async function checkManagerConnection() {
+  // If not embedded, we clearly aren't inside Manager.
+  if (window.parent === window || window.top === window) {
+    setConnectionState('disconnected', 'Standalone Mode',
+      'Open this page inside Manager.io → Settings → Extensions to connect.');
+    return;
+  }
+  // Probe the host with a cheap request.
+  try {
+    await new Promise((resolve, reject) => {
+      const rid = crypto.randomUUID();
+      const timer = setTimeout(() => {
+        window.removeEventListener('message', h);
+        reject(new Error('timeout'));
+      }, 3500);
+      function h(e) {
+        if (MANAGER_ORIGIN && e.origin !== MANAGER_ORIGIN) return;
+        if (e.source !== window.parent) return;
+        if (e.data?.type?.endsWith('-response') && e.data?.requestId === rid) {
+          clearTimeout(timer);
+          window.removeEventListener('message', h);
+          if (!MANAGER_ORIGIN && e.origin) {
+            MANAGER_ORIGIN = e.origin;
+            updateOriginDisplay();
+          }
+          resolve(e.data.body);
+        }
+      }
+      window.addEventListener('message', h);
+      window.parent.postMessage({
+        type: 'api-request', method: 'GET',
+        path: '/api4/sales-invoice-batch?PageSize=1',
+        requestId: rid
+      }, '*');
+    });
+    setConnectionState('connected', 'Connected to Manager.io',
+      'Live API access confirmed.');
+  } catch (e) {
+    setConnectionState('disconnected', 'Not Connected',
+      'Running inside an iframe, but Manager.io did not respond. Ensure the extension is installed correctly.');
+  }
+}
+
+// Run the check shortly after load so the host has time to initialise.
+setTimeout(checkManagerConnection, 600);
+
+/* ══════════════════════════════════════════════
+   MODAL CONTROLS
+══════════════════════════════════════════════ */
+function openHireModal() { document.getElementById('hire-overlay').classList.add('open'); }
+function closeHireModal() { document.getElementById('hire-overlay').classList.remove('open'); }
+function openSecurityModal() {
+  updateOriginDisplay();
+  document.getElementById('sec-overlay').classList.add('open');
+}
+function closeSecurityModal() { document.getElementById('sec-overlay').classList.remove('open'); }
+function handleOverlayClick(e, which) {
+  const id = which === 'hire' ? 'hire-overlay' : 'sec-overlay';
+  if (e.target === document.getElementById(id)) {
+    if (which === 'hire') closeHireModal(); else closeSecurityModal();
+  }
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeHireModal(); closeSecurityModal(); }
+});
+
+/* ══════════════════════════════════════════════
+   getBatchSalesInvoice — fetches ALL pages automatically — DO NOT SIMPLIFY
+══════════════════════════════════════════════ */
+async function getBatchSalesInvoice(onProgress) {
+  const allItems = [];
+  let nextToken  = null;
+  let pageNum    = 0;
+  let apiTotal   = null;
+
+  do {
+    const path = nextToken
+      ? '/api4/sales-invoice-batch?PageSize=99999&next_page_token=' + encodeURIComponent(nextToken)
+      : '/api4/sales-invoice-batch?PageSize=99999';
+
+    const data = await postMessageWithResponse({ type: 'api-request', method: 'GET', path });
+
+    const page = Array.isArray(data) ? data : (data.items || []);
+    allItems.push(...page);
+
+    nextToken = data.next_page_token || data.nextPageToken
+      || data._links?.next?.href || null;
+
+    if (apiTotal === null) {
+      apiTotal = data.totalCount ?? data.total ?? data.count
+        ?? data._metadata?.totalCount ?? null;
+    }
+
+    pageNum++;
+    if (onProgress) onProgress(allItems.length, apiTotal, pageNum);
+    if (pageNum >= 1000) break;
+
+  } while (nextToken);
+
+  return allItems;
+}
+
+/* ══════════════════════════════════════════════
+   loadAllRecords — wired to the Load button
+══════════════════════════════════════════════ */
+async function loadAllRecords() {
+  const btn    = document.getElementById('load-btn');
+  const bar    = document.getElementById('prog-bar');
+  const status = document.getElementById('status-text');
+  const app    = document.getElementById('app');
+
+  btn.disabled = true;
+  btn.textContent = 'Loading…';
+  bar.style.width = '0%';
+  app.innerHTML = '';
+
+  try {
+    const items = await getBatchSalesInvoice((loaded, total, page) => {
+      status.textContent = total
+        ? `Page ${page} · ${loaded.toLocaleString()} / ${total.toLocaleString()} records`
+        : `Page ${page} · ${loaded.toLocaleString()} records loaded…`;
+      if (total) bar.style.width = Math.min(95, Math.round(loaded / total * 100)) + '%';
+    });
+
+    bar.style.width = '100%';
+    status.textContent = `✓ ${items.length.toLocaleString()} records loaded`;
+    btn.textContent = '↺ Reload';
+    btn.disabled = false;
+
+    render(items);
+
+  } catch (err) {
+    status.textContent = '⚠ ' + err.message;
+    btn.textContent = '↺ Retry';
+    btn.disabled = false;
+    app.innerHTML = `<div class="error-box">⚠ ${err.message}<br><small>Make sure this extension is running inside Manager.io</small></div>`;
+  }
+}
+
+/* ══════════════════════════════════════════════
+   GLOBAL STATE
+══════════════════════════════════════════════ */
+let ALL_ITEMS = [];
+let chartInstances = {}; // track Chart.js instances to destroy on re-render
+
+/* ══════════════════════════════════════════════
+   UTILITIES
+══════════════════════════════════════════════ */
+const MONTHS = ['January','February','March','April','May','June',
+                'July','August','September','October','November','December'];
+const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTH_CLASSES = ['mh-jan','mh-feb','mh-mar','mh-apr','mh-may','mh-jun',
+                       'mh-jul','mh-aug','mh-sep','mh-oct','mh-nov','mh-dec'];
+
+// Color palette for multiple months in comparison chart
+const MONTH_COLORS = [
+  '#1d6fcf','#7c3aed','#16a34a','#d97706','#dc2626','#0d9488',
+  '#db2777','#ea580c','#0891b2','#65a30d','#9333ea','#b45309'
+];
+
+// Format a value as a plain number — no currency symbol
+function fmtKWD(v) {
+  const n = Number(v) || 0;
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Compact short format for chart axis labels
+function fmtShort(v) {
+  const n = Math.abs(Number(v));
+  if (n >= 1000000) return (v / 1000000).toFixed(1) + 'M';
+  if (n >= 1000)    return (v / 1000).toFixed(1) + 'K';
+  return Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Parse invoice date → { year, month (0-based), day }
+function parseDate(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d)) return null;
+  return { year: d.getFullYear(), month: d.getMonth(), day: d.getDate() };
+}
+
+/* Compute invoice total from lines, converted to BASE currency.
+   Foreign-currency invoices carry:
+     - item.exchangeRate           (e.g. 0.8585)
+     - item.exchangeRateIsInverse  (true / false)
+   Conversion rule (Manager.io):
+     - exchangeRateIsInverse = false  →  base = foreign × rate
+     - exchangeRateIsInverse = true   →  base = foreign ÷ rate
+   If the rate is missing, 0, or exactly 1, the invoice is already in base
+   currency and the raw line total is returned as-is. */
+function invoiceTotal(inv) {
+  const lines = inv.item?.lines || [];
+  if (!lines.length) {
+    // fallback to salesUnitPrice × qty if no lines
+    return 0;
+  }
+  let total = 0;
+  for (const ln of lines) {
+    const qty   = ln.qty   || 1;
+    const price = ln.salesUnitPrice || 0;
+    const disc  = ln.discountAmount || 0;
+    total += qty * price - disc;
+  }
+
+  // ── Foreign → base currency conversion ──
+  const rate = Number(inv.item?.exchangeRate) || 0;
+  if (rate > 0 && rate !== 1) {
+    total = inv.item?.exchangeRateIsInverse ? (total / rate) : (total * rate);
+  }
+
+  return total;
+}
+
+/* Group items by { year, month } → { year-month: { year, month, days: { day: total } } } */
+function groupByMonth(items) {
+  const map = {};
+  for (const inv of items) {
+    const d = parseDate(inv.item?.issueDate);
+    if (!d) continue;
+    const key = `${d.year}-${String(d.month).padStart(2,'0')}`;
+    if (!map[key]) map[key] = { year: d.year, month: d.month, days: {} };
+    const t = invoiceTotal(inv);
+    map[key].days[d.day] = (map[key].days[d.day] || 0) + t;
+  }
+  return map;
+}
+
+/* ══════════════════════════════════════════════
+   MAIN RENDER
+══════════════════════════════════════════════ */
+function render(items) {
+  ALL_ITEMS = items;
+  if (!items || !items.length) {
+    document.getElementById('app').innerHTML = `<div class="empty-state">📭 No records found. Make sure sales invoices exist in the selected period.</div>`;
+    return;
+  }
+  renderWithFilters();
+}
+
+/* Build available years & months from data */
+function getAvailableYearsMonths(items) {
+  const years  = new Set();
+  const months = new Set();
+  for (const inv of items) {
+    const d = parseDate(inv.item?.issueDate);
+    if (!d) continue;
+    years.add(d.year);
+    months.add(d.month);
+  }
+  return {
+    years:  [...years].sort((a,b) => a-b),
+    months: [...months].sort((a,b) => a-b)
+  };
+}
+
+/* Destroy all existing chart instances */
+function destroyCharts() {
+  for (const k of Object.keys(chartInstances)) {
+    try { chartInstances[k].destroy(); } catch(e) {}
+    delete chartInstances[k];
+  }
+}
+
+/* ══════════════════════════════════════════════
+   RENDER WITH FILTERS
+══════════════════════════════════════════════ */
+function renderWithFilters() {
+  destroyCharts();
+  const app = document.getElementById('app');
+
+  const { years } = getAvailableYearsMonths(ALL_ITEMS);
+
+  // Read current filter state (if already rendered)
+  const selYear     = document.getElementById('year-select')?.value || String(years[years.length - 1] || new Date().getFullYear());
+  const selMonths   = getSelectedMonths(); // array of month indices 0-11
+  const startDate   = document.getElementById('start-date')?.value || '';
+  const endDate     = document.getElementById('end-date')?.value || '';
+
+  // Filter items
+  let filtered = filterItems(ALL_ITEMS, selYear, selMonths, startDate, endDate);
+
+  // Group
+  const grouped = groupByMonth(filtered);
+  const monthKeys = Object.keys(grouped).sort();
+
+  // Build HTML
+  let html = '';
+
+  // ── Filter Panel ──
+  html += buildFilterPanel(years, selYear, selMonths, startDate, endDate);
+
+  if (!monthKeys.length) {
+    html += `<div class="empty-state">📭 No data for selected filters. Try adjusting year or months.</div>`;
+    app.innerHTML = html;
+    attachFilterListeners(years);
+    return;
+  }
+
+  // ── Overall summary cards ──
+  html += buildOverallSummary(grouped, monthKeys);
+
+  // ── Revenue Evolution (main chart) ──
+  html += buildRevenueEvolution(grouped, monthKeys);
+
+  // ── Per-month sections (v2 collapsible) ──
+  const hiddenMonths = getHiddenMonths();
+  const monthSectionVisible = document.getElementById('monthly-section-wrap')
+    ? document.getElementById('monthly-section-wrap').style.display !== 'none'
+    : true;
+
+  html += buildMonthlyBreakdownSection(grouped, monthKeys, hiddenMonths, monthSectionVisible);
+
+  // ── Comparison section (only if ≥2 months) ──
+  if (monthKeys.length >= 2) {
+    html += buildComparisonSection(grouped, monthKeys);
+  }
+
+  // ── Insights ──
+  html += buildInsights(grouped, monthKeys);
+
+  // ── Coming Soon ──
+  html += buildComingSoon();
+
+  app.innerHTML = html;
+
+  // Attach listeners & build charts after DOM insert
+  attachFilterListeners(years);
+  buildAllCharts(grouped, monthKeys);
+  // Build revenue evolution with default 'day' mode
+  buildRevenueEvolutionChart(grouped, monthKeys, 'day');
+}
+
+/* ══════════════════════════════════════════════
+   FILTER HELPERS
+══════════════════════════════════════════════ */
+function getSelectedMonths() {
+  const chips = document.querySelectorAll('.month-chip.active');
+  if (!chips.length) return []; // empty = all months
+  return [...chips].map(c => parseInt(c.dataset.month));
+}
+
+/* Hidden month keys (YYYY-MM) — persisted in a module-level Set during session */
+let _hiddenMonthKeys = new Set();
+function getHiddenMonths() { return _hiddenMonthKeys; }
+function hideMonthKey(key) { _hiddenMonthKeys.add(key); renderWithFilters(); }
+function showAllMonths()   { _hiddenMonthKeys.clear();  renderWithFilters(); }
+function toggleMonthlySection() {
+  const wrap = document.getElementById('monthly-section-wrap');
+  if (!wrap) return;
+  const isHidden = wrap.style.display === 'none';
+  wrap.style.display = isHidden ? '' : 'none';
+  const btn = document.getElementById('btn-toggle-monthly');
+  if (btn) btn.textContent = isHidden ? '👁 Hide Section' : '👁 Show Section';
+}
+function toggleMonthCollapse(uid) {
+  const body = document.getElementById(`mbody_${uid}`);
+  const icon = document.getElementById(`micon_${uid}`);
+  if (!body || !icon) return;
+  body.classList.toggle('collapsed');
+  icon.classList.toggle('collapsed');
+}
+
+function filterItems(items, year, selMonths, startDate, endDate) {
+  return items.filter(inv => {
+    const d = parseDate(inv.item?.issueDate);
+    if (!d) return false;
+
+    // Year filter
+    if (year && d.year !== parseInt(year)) return false;
+
+    // Month filter (empty = all)
+    if (selMonths.length && !selMonths.includes(d.month)) return false;
+
+    // Custom date range
+    if (startDate) {
+      const invDate = inv.item?.issueDate?.substring(0,10) || '';
+      if (invDate < startDate) return false;
+    }
+    if (endDate) {
+      const invDate = inv.item?.issueDate?.substring(0,10) || '';
+      if (invDate > endDate) return false;
+    }
+
+    return true;
+  });
+}
+
+/* ══════════════════════════════════════════════
+   FILTER PANEL HTML
+══════════════════════════════════════════════ */
+function buildFilterPanel(years, selYear, selMonths, startDate, endDate) {
+  const yearOpts = years.map(y => `<option value="${y}" ${String(y)===selYear?'selected':''}>${y}</option>`).join('');
+
+  const chipHtml = MONTHS.map((m,i) => {
+    const active = selMonths.includes(i) ? 'active' : '';
+    return `<span class="month-chip ${active}" data-month="${i}" onclick="toggleMonth(this)">${MONTH_ABBR[i]}</span>`;
+  }).join('');
+
+  return `
+  <div class="filter-panel">
+    <div class="filter-group">
+      <label>Year</label>
+      <select id="year-select">${yearOpts}</select>
+    </div>
+    <div class="filter-group">
+      <label>Months (select multiple or none for all)</label>
+      <div class="months-grid" id="months-grid">${chipHtml}</div>
+    </div>
+    <div class="filter-group">
+      <label>From Date</label>
+      <input type="date" id="start-date" value="${startDate}">
+    </div>
+    <div class="filter-group">
+      <label>To Date</label>
+      <input type="date" id="end-date" value="${endDate}">
+    </div>
+    <button class="apply-btn" onclick="renderWithFilters()">Apply Filters</button>
+    <button class="clear-btn" onclick="clearFilters()">Clear</button>
+  </div>`;
+}
+
+function toggleMonth(el) {
+  el.classList.toggle('active');
+}
+function clearFilters() {
+  document.getElementById('year-select').value = document.getElementById('year-select').options[0]?.value;
+  document.querySelectorAll('.month-chip').forEach(c => c.classList.remove('active'));
+  document.getElementById('start-date').value = '';
+  document.getElementById('end-date').value   = '';
+  renderWithFilters();
+}
+
+function attachFilterListeners(years) {
+  // Auto-apply on year change
+  const ys = document.getElementById('year-select');
+  if (ys) ys.addEventListener('change', renderWithFilters);
+}
+
+/* ══════════════════════════════════════════════
+   OVERALL SUMMARY
+══════════════════════════════════════════════ */
+function buildOverallSummary(grouped, monthKeys) {
+  let grandTotal = 0, grandDays = 0, bestMonth = null, bestMonthTotal = 0;
+  let totalInvoices = 0;
+
+  for (const key of monthKeys) {
+    const m = grouped[key];
+    const mTotal = Object.values(m.days).reduce((a,b)=>a+b,0);
+    grandTotal += mTotal;
+    grandDays  += Object.keys(m.days).length;
+    if (mTotal > bestMonthTotal) { bestMonthTotal = mTotal; bestMonth = key; }
+  }
+
+  const avgPerMonth = monthKeys.length ? grandTotal / monthKeys.length : 0;
+  const avgPerDay   = grandDays ? grandTotal / grandDays : 0;
+  const bm = bestMonth ? grouped[bestMonth] : null;
+
+  return `
+  <div class="summary-grid">
+    <div class="summary-card blue">
+      <div class="sc-label">Grand Total</div>
+      <div class="sc-value">${fmtKWD(grandTotal)}</div>
+      <div class="sc-sub">across ${monthKeys.length} month(s)</div>
+    </div>
+    <div class="summary-card green">
+      <div class="sc-label">Avg / Month</div>
+      <div class="sc-value">${fmtKWD(avgPerMonth)}</div>
+      <div class="sc-sub">${monthKeys.length} months selected</div>
+    </div>
+    <div class="summary-card amber">
+      <div class="sc-label">Avg / Day</div>
+      <div class="sc-value">${fmtKWD(avgPerDay)}</div>
+      <div class="sc-sub">${grandDays} active days total</div>
+    </div>
+    <div class="summary-card purple">
+      <div class="sc-label">Best Month</div>
+      <div class="sc-value">${bm ? MONTHS[bm.month].substring(0,3)+' '+bm.year : '—'}</div>
+      <div class="sc-sub">${fmtKWD(bestMonthTotal)}</div>
+    </div>
+    <div class="summary-card teal">
+      <div class="sc-label">Active Days</div>
+      <div class="sc-value">${grandDays}</div>
+      <div class="sc-sub">days with sales</div>
+    </div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════
+   REVENUE EVOLUTION SECTION HTML
+══════════════════════════════════════════════ */
+function buildRevenueEvolution(grouped, monthKeys) {
+  if (!monthKeys.length) return '';
+  return `
+  <div class="section-header">📈 Revenue Evolution <span class="badge" style="background:var(--blue-lt);color:var(--blue)">Main Chart</span></div>
+  <div class="rev-evolution-block">
+    <div class="rev-evolution-title">
+      <h2>📊 Revenue Trend</h2>
+      <div class="rev-toggle-bar">
+        <button class="rev-toggle-btn active" id="rev-btn-day"   onclick="switchRevMode('day')">Day</button>
+        <button class="rev-toggle-btn"        id="rev-btn-week"  onclick="switchRevMode('week')">Week</button>
+        <button class="rev-toggle-btn"        id="rev-btn-month" onclick="switchRevMode('month')">Month</button>
+        <button class="rev-toggle-btn"        id="rev-btn-year"  onclick="switchRevMode('year')">Year</button>
+      </div>
+    </div>
+    <div class="rev-canvas-container">
+      <canvas id="chart_revenue_evolution"></canvas>
+    </div>
+    <div class="rev-stats-row" id="rev-stats-row"></div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════
+   MONTHLY BREAKDOWN SECTION (v2 — collapsible + hide)
+══════════════════════════════════════════════ */
+function buildMonthlyBreakdownSection(grouped, monthKeys, hiddenMonths, sectionVisible) {
+  let visibleKeys = monthKeys.filter(k => !hiddenMonths.has(k));
+  let hiddenCount = monthKeys.length - visibleKeys.length;
+
+  let monthsHtml = '';
+  for (const key of visibleKeys) {
+    monthsHtml += buildMonthBlockV2(grouped[key], key);
+  }
+  if (!monthsHtml) {
+    monthsHtml = `<div class="empty-state" style="padding:24px">All months are hidden. <button class="apply-btn" onclick="showAllMonths()" style="margin-left:8px">Show All</button></div>`;
+  }
+
+  const hiddenNote = hiddenCount > 0
+    ? `<span style="font-size:12px;color:var(--muted)">${hiddenCount} month(s) hidden</span>`
+    : '';
+
+  return `
+  <div class="section-header">📅 Monthly Breakdown</div>
+  <div class="monthly-section-controls">
+    <button class="monthly-section-toggle" id="btn-toggle-monthly" onclick="toggleMonthlySection()">${sectionVisible ? '👁 Hide Section' : '👁 Show Section'}</button>
+    ${hiddenCount > 0 ? `<button class="monthly-section-toggle" onclick="showAllMonths()">🔄 Show All Months</button>` : ''}
+    ${hiddenNote}
+  </div>
+  <div id="monthly-section-wrap" style="${sectionVisible ? '' : 'display:none'}">
+    ${monthsHtml}
+  </div>`;
+}
+
+function buildMonthBlockV2(m, key) {
+  const days     = m.days;
+  const dayNums  = Object.keys(days).map(Number).sort((a,b)=>a-b);
+  const total    = dayNums.reduce((s,d) => s + days[d], 0);
+  const avg      = dayNums.length ? total / dayNums.length : 0;
+  const bestDay  = dayNums.reduce((best,d) => days[d] > days[best] ? d : best, dayNums[0]);
+  const worstDay = dayNums.reduce((worst,d) => days[d] < days[worst] ? d : worst, dayNums[0]);
+
+  const headerClass = MONTH_CLASSES[m.month];
+  const monthName   = MONTHS[m.month];
+  const uid         = key.replace('-','_');
+
+  // Table rows
+  let rows = '';
+  for (const d of dayNums) {
+    const val = days[d];
+    const pct = total ? (val / total * 100) : 0;
+    const isBest  = d === bestDay;
+    const isWorst = d === worstDay;
+    const trClass = isBest ? 'best-row' : (isWorst ? 'worst-row' : '');
+    const badge   = isBest ? ' 🏆' : (isWorst ? ' ⚠' : '');
+    const barW    = Math.max(2, Math.round(pct * 2));
+    rows += `
+    <tr class="${trClass}">
+      <td><strong>Day ${d}</strong></td>
+      <td>${formatDayDate(m.year, m.month, d)}</td>
+      <td style="text-align:right"><strong>${fmtKWD(val)}</strong>${badge}</td>
+      <td>
+        <div class="pct-bar-wrap">
+          <div class="pct-bar" style="width:${barW}px;background:${MONTH_COLORS[m.month]}"></div>
+          <span class="pct-txt">${pct.toFixed(2)}%</span>
+        </div>
+      </td>
+    </tr>`;
+  }
+  rows += `
+  <tr class="total-row">
+    <td colspan="2">📊 Monthly Total</td>
+    <td style="text-align:right">${fmtKWD(total)}</td>
+    <td><span style="font-size:11px;color:var(--muted)">100.00%</span></td>
+  </tr>`;
+
+  return `
+  <div class="month-block-v2">
+    <div class="month-header-v2 ${headerClass}" onclick="toggleMonthCollapse('${uid}')">
+      <div class="month-title-wrap">
+        <span class="month-collapse-icon" id="micon_${uid}">▼</span>
+        <div class="month-title">${monthName} ${m.year}</div>
+        <div class="month-meta">
+          <div class="meta-item">Total: <span>${fmtKWD(total)}</span></div>
+          <div class="meta-item">Avg/Day: <span>${fmtKWD(avg)}</span></div>
+          <div class="meta-item">Best: <span>Day ${bestDay}</span></div>
+          <div class="meta-item">Active: <span>${dayNums.length} days</span></div>
+        </div>
+      </div>
+      <div class="month-header-actions" onclick="event.stopPropagation()">
+        <button class="btn-hide-month" onclick="hideMonthKey('${key}')">✕ Hide Month</button>
+      </div>
+    </div>
+    <div class="month-body-collapsible" id="mbody_${uid}">
+      <div class="month-body">
+        <div class="tab-bar">
+          <button class="tab-btn active" onclick="switchTab('${uid}','table',this)">📋 Table</button>
+          <button class="tab-btn" onclick="switchTab('${uid}','chart',this)">📈 Chart</button>
+          <button class="tab-btn" onclick="switchTab('${uid}','both',this)">⊞ Both</button>
+        </div>
+        <div id="${uid}_table">
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Day</th>
+                  <th>Date</th>
+                  <th style="text-align:right">Sales Amount</th>
+                  <th>% of Month</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+        <div id="${uid}_chart" style="display:none">
+          <div class="chart-wrap">
+            <div class="chart-title">
+              <span>Daily Sales Trend — ${monthName} ${m.year}</span>
+              <span class="chart-total-badge">Total: ${fmtKWD(total)}</span>
+            </div>
+            <div class="canvas-container">
+              <canvas id="chart_${uid}"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════
+   COMING SOON SECTION
+══════════════════════════════════════════════ */
+function buildComingSoon() {
+  return `
+  <div class="coming-soon-section">
+    <div class="section-header">🚀 Coming Soon <span class="badge" style="background:var(--amber-lt);color:var(--amber)">Planned Features</span></div>
+    <div class="coming-soon-grid">
+
+      <div class="coming-soon-card">
+        <div class="cs-icon">📦</div>
+        <div class="cs-title">Itemised Sales Analysis</div>
+        <div class="cs-desc">Break down revenue by individual product or service items across all invoices.</div>
+        <ul class="cs-features">
+          <li>Top-selling items by revenue & volume</li>
+          <li>Item performance across time periods</li>
+          <li>Revenue concentration analysis</li>
+          <li>Price change detection per item</li>
+        </ul>
+         <span class="cs-badge planned">⏳ Planned</span>
+      </div>
+
+      <div class="coming-soon-card">
+        <div class="cs-icon">👥</div>
+        <div class="cs-title">Customer Analysis</div>
+        <div class="cs-desc">Understand your customers — who buys most, trends, and segmentation.</div>
+        <ul class="cs-features">
+          <li>Top customers by revenue (Pareto 80/20)</li>
+          <li>Customer buying frequency & recency</li>
+          <li>New vs. returning customer breakdown</li>
+          <li>Customer revenue trend over time</li>
+        </ul>
+          <span class="cs-badge planned">⏳ Planned</span>
+      </div>
+<!--
+      <div class="coming-soon-card">
+        <div class="cs-icon">🎯</div>
+        <div class="cs-title">Sales Forecasting</div>
+        <div class="cs-desc">Predict future revenue using historical daily/monthly patterns.</div>
+        <ul class="cs-features">
+          <li>Next-month revenue projection</li>
+          <li>Seasonal adjustment factors</li>
+          <li>Confidence intervals on estimates</li>
+          <li>Day-of-week demand patterns</li>
+        </ul>
+        <span class="cs-badge planned">⏳ Planned</span>
+      </div>
+
+      <div class="coming-soon-card">
+        <div class="cs-icon">💳</div>
+        <div class="cs-title">Invoice Ageing & Receivables</div>
+        <div class="cs-desc">Track overdue invoices, payment delays, and cash flow exposure.</div>
+        <ul class="cs-features">
+          <li>Overdue invoice list with days past due</li>
+          <li>Ageing buckets (30 / 60 / 90+ days)</li>
+          <li>Average collection time by customer</li>
+          <li>Outstanding balance trend</li>
+        </ul>
+        <span class="cs-badge planned">⏳ Planned</span>
+      </div>
+-->
+    </div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════
+   MONTH BLOCK (v1 kept for compatibility)
+══════════════════════════════════════════════ */
+function buildMonthBlock(m, key) {
+  return buildMonthBlockV2(m, key);
+}
+
+function formatDayDate(year, month, day) {
+  const d = new Date(year, month, day);
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' });
+}
+
+function switchTab(uid, mode, btn) {
+  const tableEl = document.getElementById(`${uid}_table`);
+  const chartEl = document.getElementById(`${uid}_chart`);
+  tableEl.style.display = (mode === 'chart') ? 'none' : '';
+  chartEl.style.display = (mode === 'table') ? 'none' : '';
+  // Update tab buttons
+  btn.closest('.tab-bar').querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+/* ══════════════════════════════════════════════
+   COMPARISON SECTION
+══════════════════════════════════════════════ */
+function buildComparisonSection(grouped, monthKeys) {
+  // Day-to-day table: find common days
+  const allDays = new Set();
+  for (const key of monthKeys) {
+    Object.keys(grouped[key].days).forEach(d => allDays.add(Number(d)));
+  }
+  const sortedDays = [...allDays].sort((a,b)=>a-b);
+
+  // Header row
+  let thCells = '<th>Day</th>';
+  for (const key of monthKeys) {
+    const m = grouped[key];
+    thCells += `<th>${MONTHS[m.month].substring(0,3)} ${m.year}</th>`;
+  }
+  // Add diff columns if 2 months
+  if (monthKeys.length === 2) {
+    thCells += `<th>Diff</th><th>Δ%</th>`;
+  }
+
+  let dayRows = '';
+  for (const day of sortedDays.slice(0,31)) { // cap at 31 days
+    let rowHtml = `<td>${day}</td>`;
+    const vals = monthKeys.map(key => grouped[key].days[day] || 0);
+    for (const v of vals) {
+      rowHtml += `<td>${v ? fmtKWD(v) : '<span style="color:#cbd5e1">—</span>'}</td>`;
+    }
+    if (monthKeys.length === 2) {
+      const diff = vals[1] - vals[0];
+      const pct  = vals[0] ? ((diff / vals[0]) * 100) : null;
+      const cls  = diff > 0 ? 'up' : (diff < 0 ? 'down' : 'neutral');
+      const sign = diff > 0 ? '+' : '';
+      rowHtml += `<td class="${cls}">${sign}${fmtKWD(diff)}</td>`;
+      rowHtml += `<td class="${cls}">${pct !== null ? sign+pct.toFixed(1)+'%' : '—'}</td>`;
+    }
+    dayRows += `<tr>${rowHtml}</tr>`;
+  }
+
+  // Performance summary per month
+  let perfCards = '';
+  for (const key of monthKeys) {
+    const m      = grouped[key];
+    const dayNs  = Object.keys(m.days).map(Number).sort((a,b)=>a-b);
+    const total  = dayNs.reduce((s,d)=>s+m.days[d],0);
+    const avg    = dayNs.length ? total/dayNs.length : 0;
+    const best   = dayNs.reduce((b,d) => m.days[d]>m.days[b]?d:b, dayNs[0]);
+    const worst  = dayNs.reduce((w,d) => m.days[d]<m.days[w]?d:w, dayNs[0]);
+    const color  = MONTH_COLORS[m.month];
+    perfCards += `
+    <div class="perf-card" style="border-top:3px solid ${color}">
+      <h4 style="color:${color}">${MONTHS[m.month]} ${m.year}</h4>
+      <div class="perf-row"><span class="label">Total Sales</span><span class="value">${fmtKWD(total)}</span></div>
+      <div class="perf-row"><span class="label">Avg/Day</span><span class="value">${fmtKWD(avg)}</span></div>
+      <div class="perf-row"><span class="label">Best Day</span><span class="value">Day ${best} — ${fmtKWD(m.days[best])}</span></div>
+      <div class="perf-row"><span class="label">Worst Day</span><span class="value">Day ${worst} — ${fmtKWD(m.days[worst])}</span></div>
+      <div class="perf-row"><span class="label">Active Days</span><span class="value">${dayNs.length}</span></div>
+    </div>`;
+  }
+
+  return `
+  <div class="section-header">🔀 Month-to-Month Comparison <span class="badge" style="background:var(--purple-lt);color:var(--purple)">${monthKeys.length} months</span></div>
+  <div class="comparison-block">
+    <div class="chart-wrap">
+      <div class="chart-title"><span>📈 Overlay: Daily Sales Across Months</span></div>
+      <div class="comp-chart-container"><canvas id="chart_comparison"></canvas></div>
+    </div>
+    <div class="section-header" style="margin-top:18px;font-size:14px">📆 Day-to-Day Comparison</div>
+    <div class="day-compare-wrap">
+      <table class="day-compare-table">
+        <thead><tr>${thCells}</tr></thead>
+        <tbody>${dayRows}</tbody>
+      </table>
+    </div>
+    <div class="section-header" style="margin-top:18px;font-size:14px">📊 Performance Summary</div>
+    <div class="perf-grid">${perfCards}</div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════
+   INSIGHTS
+══════════════════════════════════════════════ */
+function buildInsights(grouped, monthKeys) {
+  const insights = [];
+
+  // Best & worst month
+  let bestKey = null, worstKey = null, bestTotal = 0, worstTotal = Infinity;
+  const monthTotals = {};
+  for (const key of monthKeys) {
+    const m = grouped[key];
+    const t = Object.values(m.days).reduce((a,b)=>a+b,0);
+    monthTotals[key] = t;
+    if (t > bestTotal)  { bestTotal  = t; bestKey  = key; }
+    if (t < worstTotal) { worstTotal = t; worstKey = key; }
+  }
+
+  if (bestKey) {
+    const bm = grouped[bestKey];
+    const dayNs = Object.keys(bm.days).map(Number);
+    const bestDay = dayNs.reduce((b,d)=>bm.days[d]>bm.days[b]?d:b,dayNs[0]);
+    insights.push({ icon:'🏆', text: `<strong>${MONTHS[bm.month]} ${bm.year}</strong> was the best-performing month with <strong>${fmtKWD(bestTotal)}</strong> in total sales. Its strongest day was <strong>Day ${bestDay}</strong> generating <strong>${fmtKWD(bm.days[bestDay])}</strong>.` });
+  }
+
+  if (worstKey && worstKey !== bestKey) {
+    const wm = grouped[worstKey];
+    insights.push({ icon:'📉', text: `<strong>${MONTHS[wm.month]} ${wm.year}</strong> had the lowest total at <strong>${fmtKWD(worstTotal)}</strong>. Consider reviewing pricing, marketing, or external factors for that period.` });
+  }
+
+  // Trend: growing or declining across months
+  if (monthKeys.length >= 2) {
+    const totals = monthKeys.map(k => monthTotals[k]);
+    let growing = 0, declining = 0;
+    for (let i = 1; i < totals.length; i++) {
+      if (totals[i] > totals[i-1]) growing++;
+      else if (totals[i] < totals[i-1]) declining++;
+    }
+    if (growing > declining) insights.push({ icon:'📈', text: `Sales show an <strong>upward trend</strong> across the selected months — ${growing} out of ${totals.length-1} consecutive month pairs showed growth.` });
+    else if (declining > growing) insights.push({ icon:'⚠', text: `Sales show a <strong>declining trend</strong> across the selected months. ${declining} out of ${totals.length-1} month transitions saw a drop. Investigate causes.` });
+    else insights.push({ icon:'↔', text: `Sales are <strong>volatile with no clear trend</strong> — months alternate between growth and decline. Consider stabilising strategies.` });
+  }
+
+  // Consistently strong/weak days across months
+  if (monthKeys.length >= 2) {
+    const daySums = {};
+    const dayCounts = {};
+    for (const key of monthKeys) {
+      for (const [d,v] of Object.entries(grouped[key].days)) {
+        daySums[d]   = (daySums[d]   || 0) + v;
+        dayCounts[d] = (dayCounts[d] || 0) + 1;
+      }
+    }
+    // Only days appearing in all months
+    const fullDays = Object.keys(daySums).filter(d => dayCounts[d] === monthKeys.length);
+    if (fullDays.length >= 2) {
+      const sorted = fullDays.sort((a,b) => daySums[b]-daySums[a]);
+      const top3   = sorted.slice(0,3).map(d=>`Day ${d}`).join(', ');
+      const bot3   = sorted.slice(-3).map(d=>`Day ${d}`).join(', ');
+      insights.push({ icon:'💪', text: `Consistently <strong>strongest days</strong> across all months: <strong>${top3}</strong>. These days reliably drive higher sales — prioritise staffing and promotions.` });
+      insights.push({ icon:'😴', text: `Consistently <strong>weakest days</strong> across all months: <strong>${bot3}</strong>. These days may benefit from targeted promotions or adjusted operations.` });
+    }
+  }
+
+  // Average daily volatility insight
+  for (const key of monthKeys) {
+    const m = grouped[key];
+    const vals = Object.values(m.days);
+    if (vals.length < 3) continue;
+    const mean = vals.reduce((a,b)=>a+b,0) / vals.length;
+    const std  = Math.sqrt(vals.reduce((s,v)=>s+(v-mean)**2,0)/vals.length);
+    const cv   = mean ? std/mean : 0;
+    if (cv > 0.6) {
+      insights.push({ icon:'🎢', text: `<strong>${MONTHS[m.month]} ${m.year}</strong> shows <strong>high daily volatility</strong> (CV=${(cv*100).toFixed(0)}%) — sales spike and dip significantly day to day. Identify the drivers of peak days.` });
+    }
+  }
+
+  const itemsHtml = insights.map(i => `
+    <div class="insight-item">
+      <span class="insight-icon">${i.icon}</span>
+      <span class="insight-text">${i.text}</span>
+    </div>`).join('');
+
+  return `
+  <div class="section-header">💡 Insights & Analysis</div>
+  <div class="insights-block">
+    <h3>📊 Report Conclusions</h3>
+    ${itemsHtml || '<div class="insight-item"><span class="insight-icon">ℹ</span><span class="insight-text">More data needed to generate meaningful insights. Select multiple months for comparative analysis.</span></div>'}
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════
+   CHART BUILDING (runs after DOM insertion)
+══════════════════════════════════════════════ */
+function buildAllCharts(grouped, monthKeys) {
+  // Individual month charts
+  for (const key of monthKeys) {
+    const uid = key.replace('-','_');
+    const canvasId = `chart_${uid}`;
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) continue;
+    buildMonthChart(canvas, grouped[key], key);
+  }
+
+  // Comparison chart
+  if (monthKeys.length >= 2) {
+    const canvas = document.getElementById('chart_comparison');
+    if (canvas) buildComparisonChart(canvas, grouped, monthKeys);
+  }
+}
+
+function buildMonthChart(canvas, m, key) {
+  const dayNums   = Object.keys(m.days).map(Number).sort((a,b)=>a-b);
+  const vals      = dayNums.map(d => m.days[d]);
+  const total     = vals.reduce((a,b)=>a+b,0);
+  const avg       = vals.length ? total/vals.length : 0;
+  const color     = MONTH_COLORS[m.month];
+
+  // Average reference line dataset
+  const avgData = dayNums.map(() => avg);
+
+  const ctx = canvas.getContext('2d');
+  chartInstances[canvas.id] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: dayNums,
+      datasets: [
+        {
+          label: `${MONTHS[m.month]} Daily Sales`,
+          data: vals,
+          borderColor: color,
+          backgroundColor: hexToRgba(color, 0.08),
+          borderWidth: 2.5,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          pointBackgroundColor: color,
+          tension: 0.35,
+          fill: true,
+        },
+        {
+          label: `Avg/Day (${fmtKWD(avg)})`,
+          data: avgData,
+          borderColor: '#94a3b8',
+          borderDash: [5,4],
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0,
+          fill: false,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 12 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${fmtKWD(ctx.raw)}`
+          }
+        }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Day of Month', font: { size: 11 } }, grid: { color: '#f1f5f9' } },
+        y: {
+          title: { display: true, text: 'Sales Amount', font: { size: 11 } },
+          grid: { color: '#f1f5f9' },
+          ticks: { callback: v => fmtShort(v) }
+        }
+      }
+    }
+  });
+}
+
+function buildComparisonChart(canvas, grouped, monthKeys) {
+  // Build common X-axis: days 1..31 — ALWAYS zero-filled (no gaps)
+  const labels = Array.from({length:31}, (_,i)=>i+1);
+
+  const datasets = monthKeys.map((key) => {
+    const m    = grouped[key];
+    // Zero-fill all 31 positions — fixes the "breaks on missing days" bug
+    const data = labels.map(d => m.days[d] != null ? m.days[d] : 0);
+    const col  = MONTH_COLORS[m.month];
+    return {
+      label: `${MONTHS[m.month]} ${m.year}`,
+      data,
+      borderColor: col,
+      backgroundColor: hexToRgba(col, 0.05),
+      borderWidth: 2,
+      pointRadius: 3,
+      pointHoverRadius: 5,
+      tension: 0.35,
+      fill: false,
+      spanGaps: true, // ensures line is always continuous
+    };
+  });
+
+  const ctx = canvas.getContext('2d');
+  chartInstances[canvas.id] = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 12 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${fmtKWD(ctx.raw)}`
+          }
+        }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Day of Month', font: { size: 11 } }, grid: { color: '#f1f5f9' } },
+        y: {
+          title: { display: true, text: 'Sales Amount', font: { size: 11 } },
+          grid: { color: '#f1f5f9' },
+          ticks: { callback: v => fmtShort(v) }
+        }
+      }
+    }
+  });
+}
+
+/* ══════════════════════════════════════════════
+   REVENUE EVOLUTION CHART ENGINE
+══════════════════════════════════════════════ */
+let _revGrouped = null;
+let _revMonthKeys = null;
+let _revMode = 'day';
+
+function switchRevMode(mode) {
+  _revMode = mode;
+  ['day','week','month','year'].forEach(m => {
+    const btn = document.getElementById(`rev-btn-${m}`);
+    if (btn) btn.classList.toggle('active', m === mode);
+  });
+  buildRevenueEvolutionChart(_revGrouped, _revMonthKeys, mode);
+}
+
+function buildRevenueEvolutionChart(grouped, monthKeys, mode) {
+  _revGrouped = grouped;
+  _revMonthKeys = monthKeys;
+  _revMode = mode;
+
+  const canvas = document.getElementById('chart_revenue_evolution');
+  if (!canvas) return;
+
+  // Destroy previous instance
+  if (chartInstances['chart_revenue_evolution']) {
+    chartInstances['chart_revenue_evolution'].destroy();
+    delete chartInstances['chart_revenue_evolution'];
+  }
+
+  // Build full date-keyed map from grouped data: { 'YYYY-MM-DD': total }
+  const dailyMap = {};
+  for (const key of monthKeys) {
+    const m = grouped[key];
+    const daysInMonth = new Date(m.year, m.month + 1, 0).getDate();
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${m.year}-${String(m.month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      dailyMap[dateStr] = m.days[d] || 0; // zero-fill missing days
+    }
+  }
+
+  const sortedDates = Object.keys(dailyMap).sort();
+  if (!sortedDates.length) return;
+
+  let labels = [];
+  let data   = [];
+  let xTitle = 'Date';
+
+  if (mode === 'day') {
+    labels = sortedDates;
+    data   = sortedDates.map(d => dailyMap[d]);
+    xTitle = 'Date';
+  } else if (mode === 'week') {
+    const weekMap = {};
+    for (const d of sortedDates) {
+      const dt = new Date(d);
+      // ISO week start (Monday)
+      const day = dt.getDay() || 7;
+      const mon = new Date(dt);
+      mon.setDate(dt.getDate() - day + 1);
+      const wk = `${mon.getFullYear()}-W${String(getISOWeek(mon)).padStart(2,'0')}`;
+      weekMap[wk] = (weekMap[wk] || 0) + dailyMap[d];
+    }
+    labels = Object.keys(weekMap).sort();
+    data   = labels.map(k => weekMap[k]);
+    xTitle = 'Week';
+  } else if (mode === 'month') {
+    const mMap = {};
+    for (const d of sortedDates) {
+      const mk = d.substring(0, 7); // YYYY-MM
+      mMap[mk] = (mMap[mk] || 0) + dailyMap[d];
+    }
+    labels = Object.keys(mMap).sort();
+    data   = labels.map(k => {
+      const [y,mo] = k.split('-');
+      return mMap[k];
+    });
+    // Pretty labels
+    labels = labels.map(k => {
+      const [y,mo] = k.split('-');
+      return `${MONTH_ABBR[parseInt(mo)-1]} ${y}`;
+    });
+    xTitle = 'Month';
+  } else if (mode === 'year') {
+    const yMap = {};
+    for (const d of sortedDates) {
+      const y = d.substring(0, 4);
+      yMap[y] = (yMap[y] || 0) + dailyMap[d];
+    }
+    labels = Object.keys(yMap).sort();
+    data   = labels.map(k => yMap[k]);
+    xTitle = 'Year';
+  }
+
+  // Compute stats
+  const total  = data.reduce((a,b)=>a+b,0);
+  const avg    = data.length ? total/data.length : 0;
+  const maxVal = Math.max(...data);
+  const minVal = Math.min(...data.filter(v=>v>0));
+  const maxLabel = labels[data.indexOf(maxVal)] || '—';
+
+  // Update stats row
+  const statsRow = document.getElementById('rev-stats-row');
+  if (statsRow) {
+    statsRow.innerHTML = `
+      <div class="rev-stat"><div class="rs-label">Total Revenue</div><div class="rs-val">${fmtKWD(total)}</div><div class="rs-sub">${mode} view</div></div>
+      <div class="rev-stat"><div class="rs-label">Avg per ${mode.charAt(0).toUpperCase()+mode.slice(1)}</div><div class="rs-val">${fmtKWD(avg)}</div><div class="rs-sub">${data.length} ${mode}s</div></div>
+      <div class="rev-stat"><div class="rs-label">Peak ${mode.charAt(0).toUpperCase()+mode.slice(1)}</div><div class="rs-val">${fmtKWD(maxVal)}</div><div class="rs-sub">${maxLabel}</div></div>
+      <div class="rev-stat"><div class="rs-label">Data Points</div><div class="rs-val">${data.length}</div><div class="rs-sub">zero-filled</div></div>
+    `;
+  }
+
+  const gradient = canvas.getContext('2d').createLinearGradient(0, 0, 0, 280);
+  gradient.addColorStop(0,   hexToRgba('#1d6fcf', 0.25));
+  gradient.addColorStop(1,   hexToRgba('#1d6fcf', 0.01));
+
+  const ctx = canvas.getContext('2d');
+  chartInstances['chart_revenue_evolution'] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: `Revenue (${mode})`,
+        data,
+        borderColor: '#1d6fcf',
+        backgroundColor: gradient,
+        borderWidth: 2.5,
+        pointRadius: mode === 'day' && data.length > 60 ? 0 : 4,
+        pointHoverRadius: 6,
+        pointBackgroundColor: '#1d6fcf',
+        tension: 0.35,
+        fill: true,
+        spanGaps: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: { label: ctx => ` Revenue: ${fmtKWD(ctx.raw)}` }
+        }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: xTitle, font: { size: 11 } },
+          grid: { color: '#f1f5f9' },
+          ticks: {
+            maxRotation: 45,
+            // Thin out labels when many data points
+            maxTicksLimit: 16,
+            font: { size: 10 }
+          }
+        },
+        y: {
+          title: { display: true, text: 'Sales Amount', font: { size: 11 } },
+          grid: { color: '#f1f5f9' },
+          ticks: { callback: v => fmtShort(v) },
+          beginAtZero: true,
+        }
+      }
+    }
+  });
+}
+
+function getISOWeek(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1)/7);
+}
+
+// Hex → rgba helper
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+/* ══ AUTH GATE — Supabase ══
+   Replace values below with yours from:
+   supabase.com → project → Settings → API
+══════════════════════════════════════════════ */
+const SB_URL  = 'https://YOUR_PROJECT_ID.supabase.co';
+const SB_ANON = 'YOUR_ANON_PUBLIC_KEY';
+const _sb = supabase.createClient(SB_URL, SB_ANON);
+
+(async () => {
+  const { data: { session } } = await _sb.auth.getSession();
+  if (session) unlockApp(session.user);
+})();
+_sb.auth.onAuthStateChange((_, s) => { if (s) unlockApp(s.user); });
+
+function unlockApp(user) {
+  const gate = document.getElementById('auth-gate');
+  gate.classList.add('hidden');
+  setTimeout(() => gate.style.display = 'none', 350);
+  document.getElementById('hdr-user-pill').style.display = 'flex';
+  document.getElementById('hdr-user-email').textContent = user.email;
+}
+function agTab(t) {
+  document.querySelectorAll('.ag-tab').forEach((b,i) =>
+    b.classList.toggle('on',(t==='in'&&i===0)||(t==='up'&&i===1)));
+  document.querySelectorAll('.ag-panel').forEach(p=>p.classList.remove('on'));
+  document.getElementById('ag-panel-'+t).classList.add('on');
+}
+async function agSignIn() {
+  const email=document.getElementById('ag-in-email').value.trim();
+  const pass=document.getElementById('ag-in-pass').value;
+  if(!email||!pass) return agErr('in','Please enter email and password.');
+  agLoad('in',true);
+  const {error}=await _sb.auth.signInWithPassword({email,password:pass});
+  agLoad('in',false);
+  if(error) agErr('in',error.message);
+}
+async function agSignUp() {
+  const email=document.getElementById('ag-up-email').value.trim();
+  const pass=document.getElementById('ag-up-pass').value;
+  const first=document.getElementById('ag-up-first').value.trim();
+  const last=document.getElementById('ag-up-last').value.trim();
+  if(!email||!pass) return agErr('up','Please fill in all fields.');
+  agLoad('up',true);
+  const {error}=await _sb.auth.signUp({email,password:pass,options:{data:{first_name:first,last_name:last}}});
+  agLoad('up',false);
+  if(error) agErr('up',error.message);
+  else agErr('up','✅ Check your email to confirm, then sign in.');
+}
+async function agSignOut() {
+  await _sb.auth.signOut();
+  document.getElementById('hdr-user-pill').style.display='none';
+  const gate=document.getElementById('auth-gate');
+  gate.style.display='flex';
+  setTimeout(()=>gate.classList.remove('hidden'),10);
+}
+async function agForgot() {
+  const email=document.getElementById('ag-in-email').value.trim();
+  if(!email) return agErr('in','Enter your email above first.');
+  await _sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin});
+  agErr('in','📧 Reset link sent — check your inbox!');
+}
+function agLoad(w,on){const b=document.getElementById('ag-btn-'+w);b.disabled=on;b.textContent=on?'Please wait…':(w==='in'?'Sign In →':'Create Free Account →');}
+function agErr(w,msg){const e=document.getElementById('ag-err-'+w);e.textContent=msg;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),6000);}
+</script>
+</body>
+</html>
